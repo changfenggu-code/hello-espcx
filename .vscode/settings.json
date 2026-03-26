@@ -1,0 +1,7 @@
+{
+  "rust-analyzer.files.excludeItems": [
+    "contrib/esp-hal/xtensa-lx/**",
+    "contrib/esp-hal/xtensa-lx-rt/**",
+    "contrib/esp-hal/xtensa-lx-rt-proc-macros/**"
+  ]
+}

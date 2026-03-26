@@ -1,0 +1,20 @@
+[package]
+name = "winble"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# GATT operations via bluest
+bluest = "0.6.9"
+
+# Async runtime
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+postcard = { version = "1", default-features = false, features = ["alloc"] }
+
+# Utilities
+futures-util = "0.3"
+futures-core = "0.3"
+thiserror = "2"

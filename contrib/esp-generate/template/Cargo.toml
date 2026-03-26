@@ -1,0 +1,255 @@
+[package]
+#REPLACE project-name project-name
+name = "project-name"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+
+[[bin]]
+#REPLACE project-name project-name
+name = "project-name"
+path = "./src/bin/main.rs"
+#IF option("embedded-test")
+test = false
+
+[[test]]
+name    = "hello_test"
+harness = false
+
+[lib]
+test = false
+#ENDIF
+
+[dependencies]
+esp-hal = { version = "~1.0", features = [
+    #REPLACE esp32c6 mcu
+    "esp32c6",
+    #IF option("unstable-hal")
+    "unstable",
+    #ENDIF
+    #IF option("defmt")
+    #+"defmt",
+    #ENDIF
+    #IF option("log")
+    "log-04",
+    #ENDIF
+] }
+
+#IF option("embassy") || option("wifi") || option("ble-bleps") || option("ble-trouble")
+esp-rtos = { version = "0.2.0", features = [
+    #IF option("wifi") || option("ble-bleps") || option("ble-trouble")
+    "esp-radio",
+    #ENDIF
+    #IF option("alloc")
+    "esp-alloc",
+    #ENDIF
+    #IF option("embassy")
+    "embassy",
+    #ENDIF
+    #REPLACE esp32c6 mcu
+    "esp32c6",
+    #IF option("defmt")
+    #+"defmt",
+    #ENDIF
+    #IF option("log")
+    "log-04",
+    #ENDIF
+]}
+#ENDIF
+
+esp-bootloader-esp-idf = { version = "0.4.0", features = [
+    #IF option("defmt")
+    #+"defmt",
+    #ENDIF
+    #IF option("log")
+    "log-04",
+    #ENDIF
+    #REPLACE esp32c6 mcu
+    "esp32c6",
+] }
+#IF option("defmt")
+#+defmt = "1.0.1"
+#ELIF option("log")
+log = "0.4.27"
+#ENDIF
+
+#IF option("log-frontend") || option("panic-handler") || option("probe-rs")
+#IF option("probe-rs")
+#IF option("defmt")
+rtt-target = { version = "0.6.2", features = ["defmt"] }
+#ELSE
+#+rtt-target = "0.6.2"
+#ENDIF defmt
+#ELSE probe-rs
+esp-println = { version = "0.16.1", features = [
+    #REPLACE esp32c6 mcu
+    "esp32c6",
+    #IF option("defmt")
+    #+"defmt-espflash",
+    #ENDIF
+    #IF option("log")
+    "log-04",
+    #ENDIF
+] }
+#ENDIF probe-rs
+#ENDIF log-frontend || panic-handler || probe-rs
+#IF option("esp-backtrace")
+esp-backtrace = { version = "0.18.1", features = [
+    #REPLACE esp32c6 mcu
+    "esp32c6",
+    "panic-handler",
+    #IF option("defmt")
+    #+"defmt",
+    #ELSE
+    "println",
+    #ENDIF
+] }
+#ELIF option("panic-rtt-target")
+#IF option("defmt")
+#+panic-rtt-target = { version = "0.2.0", features = ["defmt"] }
+#ELSE
+panic-rtt-target = "0.2.0"
+#ENDIF defmt
+#ENDIF esp-backtrace
+#IF option("alloc")
+#IF option("defmt")
+#+esp-alloc = { version = "0.9.0", features = ["defmt"] }
+#ELSE
+esp-alloc = "0.9.0"
+#ENDIF defmt
+#ENDIF alloc
+#IF option("wifi") || option("ble-bleps") || option("ble-trouble")
+#IF option("defmt")
+#+embedded-io = { version = "0.7.1", features = ["defmt"] }
+#ELSE
+embedded-io = "0.7.1"
+#ENDIF defmt
+#IF option("embassy")
+#IF option("defmt")
+#+embedded-io-async = { version = "0.7.0", features = ["defmt"] }
+#ELSE
+embedded-io-async = "0.7.0"
+#ENDIF defmt
+#IF option("wifi")
+embassy-net = { version = "0.7.1", features = [
+    "tcp",
+    "udp",
+    "dhcpv4",
+    "medium-ethernet",
+    #IF option("defmt")
+    #+"defmt",
+    #ENDIF
+    #IF option("log")
+    "log",
+    #ENDIF
+] }
+# for more networking protocol support see https://crates.io/crates/edge-net
+#ENDIF wifi
+#ENDIF embassy
+#IF option("wifi")
+smoltcp = { version = "0.12.0", default-features = false, features = [
+    "medium-ethernet",
+    "multicast",
+    "proto-dhcpv4",
+    "proto-dns",
+    "proto-ipv4",
+    "socket-dns",
+    "socket-raw",
+    "socket-tcp",
+    "socket-udp",
+    "socket-icmp",
+    #IF option("defmt")
+    #+"defmt",
+    #ENDIF
+    #IF option("log")
+    "log",
+    #ENDIF
+] }
+#ENDIF wifi
+esp-radio = { version = "0.17.0", features = [
+    #REPLACE esp32c6 mcu
+    "esp32c6",
+    #IF option("wifi")
+    "wifi",
+    "smoltcp",
+    #ENDIF
+    #IF option("ble-bleps") || option("ble-trouble")
+    "ble",
+    #ENDIF
+    #IF option("wifi") && (option("ble-bleps") || option("ble-trouble"))
+    "coex",
+    #ENDIF
+    #IF option("alloc")
+    "esp-alloc",
+    #ENDIF
+    "unstable",
+    #IF option("defmt")
+    #+"defmt",
+    #ENDIF
+    #IF option("log")
+    "log-04",
+    #ENDIF
+] }
+#IF option("ble-bleps")
+#+bleps = { git = "https://github.com/bjoernQ/bleps", package = "bleps", rev = "a5148d8ae679e021b78f53fd33afb8bb35d0b62e", features = [ "macros", "async"] }
+#ENDIF
+#IF option("ble-trouble")
+#+trouble-host = { version = "0.5.0", features = ["gatt"] }
+#+bt-hci = "0.6.0"
+#ENDIF
+#ENDIF wifi || ble || ble-trouble
+#IF option("embassy")
+embassy-executor = { version = "0.9.1", features = [
+    #IF option("defmt")
+    #+"defmt",
+    #ENDIF
+    #IF option("log")
+    "log",
+    #ENDIF
+] }
+#IF option("defmt")
+#+embassy-time     = { version = "0.5.0", features = ["defmt"] }
+#ENDIF
+#IF option("log")
+embassy-time = { version = "0.5.0", features = ["log"] }
+#ENDIF
+#IF !option("defmt") && !option("log")
+#+embassy-time     = "0.5.0"
+#ENDIF
+
+static_cell = "2.1.1"
+#ENDIF
+critical-section = "1.2.0"
+
+#IF option("embedded-test")
+[dev-dependencies]
+embedded-test = { version = "0.7.0", features = [
+    #IF option("xtensa")
+    "xtensa-semihosting",
+    #ENDIF
+    #IF option("embassy")
+    "embassy",
+    "external-executor",
+    #ENDIF
+    #IF option("defmt")
+    #+"defmt",
+    #ENDIF
+    #IF option("log")
+    "log-04",
+    #ENDIF
+] }
+#ENDIF embedded-test
+
+[profile.dev]
+# Rust debug is too slow.
+# For debug builds always builds with some optimization
+opt-level = "s"
+
+[profile.release]
+codegen-units = 1        # LLVM can perform better optimizations using a single thread
+debug = 2
+debug-assertions = false
+incremental = false
+lto = 'fat'
+opt-level = 's'
+overflow-checks = false
