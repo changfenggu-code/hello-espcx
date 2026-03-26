@@ -7,13 +7,16 @@ target/
 # macOS
 **/.DS_Store
 
-# Editor config (machine-specific)
-.vscode/tasks.json
-.vscode/launch.json
-.vscode/c_cpp_properties.json
+# IDE configs (machine-specific)
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
 
 # Claude Code
-.claude/settings.json
+.claude/
+
+# GSD workflow
+.planning/
 
 # IDEs
 .idea/
@@ -21,4 +24,5 @@ target/
 .helix/
 .nvim.lua
 
+# Reference
 llm/

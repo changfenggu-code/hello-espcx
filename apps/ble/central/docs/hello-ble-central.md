@@ -59,7 +59,7 @@ BleSession（lib.rs）— 业务 API
     ├── 连接管理：disconnect(), is_connected()
     ├── 读：battery_level(), device_info(), status(), read_bulk_stats()
     ├── 写：set_status(), echo(), start_bulk_stream(), upload_bulk_data(), reset_bulk_stats()
-    ├── 订阅：heart_rate_stream(), notifications()
+    ├── 订阅：notifications()
     └── UUID 获取：battery_uuid(), echo_uuid(), bulk_data_uuid(), ...
             │
             ▼
@@ -99,7 +99,6 @@ pub struct BleSession {
     model_uuid: Uuid,          // 0x2A24
     firmware_uuid: Uuid,       // 0x2A26
     software_uuid: Uuid,       // 0x2A28
-    heart_rate_uuid: Uuid,     // 0x2A37
     echo_uuid: Uuid,          // 自定义 UUID128
     status_uuid: Uuid,         // 自定义 UUID128
     bulk_control_uuid: Uuid,   // 自定义 UUID128
@@ -140,7 +139,6 @@ pub struct BleSession {
 
 | 方法 | 说明 |
 |---|---|
-| `heart_rate_stream()` | 心率通知流，过滤空数据，返回 `u8` |
 | `notifications(uuid)` | 通用通知订阅，按 UUID 订阅 |
 
 #### UUID 获取
@@ -148,7 +146,6 @@ pub struct BleSession {
 | 方法 | 说明 |
 |---|---|
 | `battery_uuid()` | 获取电量特征 UUID |
-| `heart_rate_uuid()` | 获取心率特征 UUID |
 | `echo_uuid()` | 获取 Echo 特征 UUID |
 | `bulk_data_uuid()` | 获取 bulk 数据特征 UUID |
 
@@ -229,15 +226,12 @@ loop {
 3. **读取电量**
 4. **读写状态**（bool）
 5. **发送 Echo**
-6. **订阅心率和电量通知**
+6. **订阅电量通知**
 
-使用 `tokio::select!` 并发监听三个事件源：
+使用 `tokio::select!` 并发监听两个事件源：
 
 ```rust
 tokio::select! {
-    // 心率通知到达
-    hr = hr_stream.next() => { ... }
-
     // 电量通知到达
     notification = battery_stream.next() => { ... }
 
@@ -355,7 +349,6 @@ fn print_throughput(label: &str, total_bytes: usize, elapsed: Duration)
 ### Peripheral → Central（通知）
 
 ```
-ESP32 每 1s  →  心率通知（u8）
 ESP32 每 2s  →  电量通知（u8）
 ESP32 按需   →  Echo 通知（回显数据）
 ESP32 按需   →  Status 通知（状态变化）

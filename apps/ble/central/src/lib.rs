@@ -3,7 +3,7 @@ use futures_util::StreamExt;
 use hello_ble_common::{
     BulkControlCommand, BulkStats, BATTERY_LEVEL_UUID16, BULK_CONTROL_UUID,
     BULK_CHUNK_UUID, BULK_CHUNK_SIZE, BULK_STATS_UUID, ECHO_CAPACITY, ECHO_UUID,
-    HEART_RATE_MEASUREMENT_UUID16, PERIPHERAL_NAME, SERVICE_BATTERY_UUID16, STATUS_UUID,
+    PERIPHERAL_NAME, SERVICE_BATTERY_UUID16, STATUS_UUID,
     DEVICE_INFO_MANUFACTURER_NAME_UUID16, DEVICE_INFO_MODEL_NUMBER_UUID16,
     DEVICE_INFO_FIRMWARE_REVISION_UUID16, DEVICE_INFO_SOFTWARE_REVISION_UUID16,
 };
@@ -31,8 +31,6 @@ pub struct BleSession {
     model_uuid: Uuid,
     firmware_uuid: Uuid,
     software_uuid: Uuid,
-    // Heart Rate UUIDs
-    heart_rate_uuid: Uuid,
     // Custom service UUIDs
     echo_uuid: Uuid,
     status_uuid: Uuid,
@@ -58,20 +56,6 @@ impl BleSession {
         let firmware = self.session.read_string(self.firmware_uuid).await?;
         let software = self.session.read_string(self.software_uuid).await?;
         Ok(DeviceInfo { manufacturer, model, firmware, software })
-    }
-
-    /// Get heart rate notifications stream
-    pub async fn heart_rate_stream(
-        &self,
-    ) -> anyhow::Result<impl StreamExt<Item = anyhow::Result<u8>> + Unpin> {
-        let stream = self.notifications(self.heart_rate_uuid).await?;
-        Ok(stream.filter_map(|r| async move {
-            match r {
-                Ok(bytes) if !bytes.is_empty() => Some(Ok(bytes[0])),
-                Ok(_) => None,
-                Err(e) => Some(Err(anyhow!("{}", e))),
-            }
-        }).boxed())
     }
 
     /// Read status value (uses postcard)
@@ -164,10 +148,6 @@ impl BleSession {
         self.battery_uuid
     }
 
-    pub fn heart_rate_uuid(&self) -> Uuid {
-        self.heart_rate_uuid
-    }
-
     pub fn echo_uuid(&self) -> Uuid {
         self.echo_uuid
     }
@@ -212,8 +192,6 @@ pub async fn connect_session_with_timeout(timeout: Duration) -> Result<BleSessio
         model_uuid: Uuid::from_u16(DEVICE_INFO_MODEL_NUMBER_UUID16),
         firmware_uuid: Uuid::from_u16(DEVICE_INFO_FIRMWARE_REVISION_UUID16),
         software_uuid: Uuid::from_u16(DEVICE_INFO_SOFTWARE_REVISION_UUID16),
-        // Heart Rate
-        heart_rate_uuid: Uuid::from_u16(HEART_RATE_MEASUREMENT_UUID16),
         // Custom services
         echo_uuid: Uuid::from_u128(ECHO_UUID),
         status_uuid: Uuid::from_u128(STATUS_UUID),

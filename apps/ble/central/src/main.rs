@@ -75,26 +75,12 @@ async fn monitor_session(session: &mut hello_ble_central::BleSession) -> anyhow:
     session.echo(test_data).await?;
     tracing::info!("Echo sent: {:?}", String::from_utf8_lossy(test_data));
 
-    // === 5. Heart Rate (notify) ===
-    let mut hr_stream = session.heart_rate_stream().await?;
-    tracing::info!("Subscribed to heart rate notifications");
-
     // Subscribe to battery notifications
     let mut battery_stream = session.notifications(session.battery_uuid()).await?;
 
     // Periodic monitoring
     loop {
         tokio::select! {
-            // Heart rate notification
-            hr = hr_stream.next() => {
-                match hr {
-                    Some(Ok(bpm)) => {
-                        tracing::info!("[notify] Heart Rate: {} bpm", bpm);
-                    }
-                    Some(Err(e)) => tracing::warn!("HR error: {}", e),
-                    None => tracing::warn!("Heart rate stream ended"),
-                }
-            },
             // Battery notification
             notification = battery_stream.next() => {
                 match notification {

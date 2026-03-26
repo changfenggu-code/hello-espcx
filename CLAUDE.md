@@ -66,6 +66,20 @@ just check
 - 外设日志使用 `rprintln!`
 - `peripheral/` 使用 `nightly` 和 `riscv32imac-unknown-none-elf`
 
+## Codebase Map（`.planning/codebase/`）
+
+项目已通过 `/gsd:map-codebase` 生成完整的 codebase 文档，作为代码库全景参考：
+
+| 文档 | 行数 | 用途 |
+|------|------|------|
+| `ARCHITECTURE.md` | 456 | 软件架构、状态管理、并发模型、错误处理 |
+| `STRUCTURE.md` | 396 | 目录结构、文件用途、模块组织 |
+| `CONVENTIONS.md` | 359 | 编码规范、GATT 宏用法、序列化格式 |
+| `STACK.md` | 227 | 完整依赖栈、工具链、构建工具 |
+| `TESTING.md` | 167 | HIL 测试策略、运行方式、测试覆盖 |
+| `INTEGRATIONS.md` | 158 | 组件集成、依赖图、Cargo workspace |
+| `CONCERNS.md` | 150 | 技术债、安全考量、扩展性、运维风险 |
+
 ## IDE 备注
 
 `.vscode/settings.json` 把 rust-analyzer 目标固定成了 RISC-V，这对外设侧是对的，但看 `central/` 时以 `cargo check` 结果为准。

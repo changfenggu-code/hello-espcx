@@ -297,17 +297,11 @@ async fn main() -> anyhow::Result<()> {
     // Echo 测试
     session.echo(b"Hello, BLE!").await?;
 
-    // 订阅通知
-    let mut hr_stream = session.heart_rate_stream().await?;
+    // 订阅电量通知
     let mut battery_stream = session.notifications(session.battery_uuid()).await?;
 
     loop {
         tokio::select! {
-            hr = hr_stream.next() => {
-                if let Some(Ok(bpm)) = hr {
-                    println!("Heart Rate: {} bpm", bpm);
-                }
-            }
             notif = battery_stream.next() => {
                 if let Some(Ok(n)) = notif {
                     println!("Battery: {}%", n[0]);

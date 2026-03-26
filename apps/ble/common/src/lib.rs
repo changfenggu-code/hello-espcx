@@ -10,7 +10,6 @@
 //! |---------|---------|------------|
 //! | Battery | Battery level monitoring | `read` + `notify` |
 //! | Device Info | Device information | `read` (manufacturer, model, firmware, software) |
-//! | Heart Rate | Heart rate monitoring | `read` + `notify` + `write` |
 //!
 //! ## Custom Services (UUID128)
 //!
@@ -46,18 +45,6 @@ pub const DEVICE_INFO_FIRMWARE_REVISION_UUID16: u16 = 0x2A26;
 pub const DEVICE_INFO_SOFTWARE_REVISION_UUID16: u16 = 0x2A28;
 /// Max string length for Device Info characteristics
 pub const DEVICE_INFO_STRING_CAPACITY: usize = 30;
-
-// === Heart Rate Service (Standard BLE) ===
-// Purpose: Demonstrate `notify` + `write` control
-// - Heart Rate Measurement: peripheral notifies heart rate value
-// - Heart Rate Control Point: central writes to control peripheral behavior
-pub const SERVICE_HEART_RATE_UUID16: u16 = 0x180D;
-pub const HEART_RATE_MEASUREMENT_UUID16: u16 = 0x2A37;
-pub const HEART_RATE_CONTROL_UUID16: u16 = 0x2A39;
-/// Max size for Heart Rate Measurement characteristic (flags + heart rate value)
-pub const HEART_RATE_MEASUREMENT_CAPACITY: usize = 3;
-/// Max size for Heart Rate Control Point (1 byte command)
-pub const HEART_RATE_CONTROL_CAPACITY: usize = 1;
 
 // === Echo Service (Custom) ===
 // Purpose: Test `write` → `notify` round-trip

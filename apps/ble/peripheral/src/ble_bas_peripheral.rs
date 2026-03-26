@@ -2,7 +2,7 @@
 #![allow(clippy::needless_borrows_for_generic_args)]
 #![allow(dead_code)] // device_info_service provided for standard BLE compliance
 
-use core::sync::atomic::{AtomicU32, AtomicU16, AtomicBool, Ordering};
+use core::sync::atomic::{AtomicU32, Ordering};
 use embassy_futures::join::join;
 use embassy_futures::select::select;
 use embassy_time::Timer;
@@ -36,7 +36,6 @@ fn fill_test_pattern(start_offset: usize, buffer: &mut [u8]) {
 struct Server {
     battery_service: BatteryService,
     device_info_service: DeviceInfoService,
-    heart_rate_service: HeartRateService,
     echo_service: EchoService,
     status_service: StatusService,
     bulk_service: BulkService,
@@ -60,15 +59,6 @@ struct DeviceInfoService {
     firmware: &'static str,
     #[characteristic(uuid = characteristic::SOFTWARE_REVISION_STRING, read, value = env!("CARGO_PKG_VERSION"))]
     software: &'static str,
-}
-
-// Heart Rate Service (standard BLE): notify + write control
-#[gatt_service(uuid = service::HEART_RATE)]
-struct HeartRateService {
-    #[characteristic(uuid = characteristic::HEART_RATE_MEASUREMENT, notify, indicate, value = 0)]
-    measurement: u8,
-    #[characteristic(uuid = characteristic::HEART_RATE_CONTROL_POINT, write, value = 0)]
-    control: u8,
 }
 
 // Echo Service: write -> notify
@@ -99,10 +89,6 @@ struct BulkService {
 // Bulk transfer stats
 static RX_BYTES: AtomicU32 = AtomicU32::new(0);
 static TX_BYTES: AtomicU32 = AtomicU32::new(0);
-
-// Heart rate state
-static HEART_RATE: AtomicU16 = AtomicU16::new(72);
-static HEART_RATE_NOTIFY: AtomicBool = AtomicBool::new(true);
 
 /// Run the BLE stack as a peripheral
 pub async fn run<C>(controller: C)
@@ -186,7 +172,6 @@ async fn gatt_events_task<P: PacketPool>(
     conn: &GattConnection<'_, '_, P>,
 ) -> Result<(), Error> {
     let level = server.battery_service.level;
-    let hr_control = server.heart_rate_service.control;
     let echo = server.echo_service.echo.clone();
     let status = server.status_service.status.clone();
     let bulk_control = server.bulk_service.control.clone();
@@ -201,18 +186,6 @@ async fn gatt_events_task<P: PacketPool>(
                     // Battery: read
                     GattEvent::Read(event) if event.handle() == level.handle => {
                         rprintln!("[battery] read");
-                    }
-                    // Heart Rate: control point write
-                    GattEvent::Write(event) if event.handle() == hr_control.handle => {
-                        if let [cmd] = event.data() {
-                            match cmd {
-                                0x01 => {
-                                    // Reset Energy Expended (required by HR spec)
-                                    rprintln!("[hr] reset energy expended");
-                                }
-                                _ => rprintln!("[hr] unknown control: {}", cmd),
-                            }
-                        }
                     }
                     // Echo: write -> will echo back in custom_task
                     GattEvent::Write(event) if event.handle() == echo.handle => {
@@ -276,14 +249,12 @@ async fn custom_task<C: Controller, P: PacketPool>(
     conn: &GattConnection<'_, '_, P>,
 ) {
     let level = server.battery_service.level;
-    let hr_measurement = server.heart_rate_service.measurement;
     let echo = server.echo_service.echo.clone();
     let bulk_control = server.bulk_service.control.clone();
     let bulk_data = server.bulk_service.data.clone();
     let bulk_stats = server.bulk_service.stats.clone();
 
     let mut battery_tick: u8 = 0;
-    let mut hr_value: u16 = HEART_RATE.load(Ordering::Relaxed);
 
     loop {
         // Check for bulk stream start
@@ -304,15 +275,6 @@ async fn custom_task<C: Controller, P: PacketPool>(
                 }
                 // Clear echo
                 let _ = echo.set(server, &Vec::new());
-            }
-        }
-
-        // Heart rate notification (every 1 second)
-        if HEART_RATE_NOTIFY.load(Ordering::Relaxed) {
-            hr_value = hr_value.wrapping_add(1).max(60).min(180);
-            let hr_byte = hr_value as u8;
-            if hr_measurement.notify(conn, &hr_byte).await.is_err() {
-                rprintln!("[hr] notify failed");
             }
         }
 
