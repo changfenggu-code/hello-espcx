@@ -6,10 +6,10 @@ Cross-platform BLE central library built on top of `bluest`.
 
 `btleplus` exposes BLE concepts in two layers:
 
-- `gap`: discovery, filtering, connection lifecycle
+- `gap`: discovery, filtering, selection, connection lifecycle
 - `gatt`: service discovery cache, read, write, notifications
 
-Recommended flow:
+Single-device quick path:
 
 ```rust
 use std::time::Duration;
@@ -26,58 +26,33 @@ let connection = peripheral.connect().await?;
 let gatt = connection.into_gatt().await?;
 ```
 
-To collect all matching peripherals during a scan window:
+Multi-device product path:
 
 ```rust
-let peripherals = adapter.discover(filter, Duration::from_secs(30)).await?;
-```
+use std::time::Duration;
+use btleplus::{
+    Adapter, PeripheralSelectionExt, ScanFilter, Selector, Uuid, BluetoothUuidExt,
+};
 
-## Call Path
-
-When application code builds a connection with:
-
-```rust
 let adapter = Adapter::default().await?;
-let peripheral = adapter.find(filter, timeout).await?;
+
+let filter = ScanFilter::default()
+    .with_name_pattern("hello-espcx")
+    .with_service_uuid(Uuid::from_u16(0x180F));
+
+let peripherals = adapter.discover(filter, Duration::from_secs(30)).await?;
+let selector = Selector::default()
+    .prefer_connectable()
+    .prefer_strongest_signal();
+let peripheral = peripherals.select_with(&selector)?;
+
 let connection = peripheral.connect().await?;
 let gatt = connection.into_gatt().await?;
 ```
 
-the internal flow is:
+## Call Path
 
-1. `Adapter::default()`
-   Opens the system default Bluetooth adapter.
-
-2. `Adapter::find(filter, timeout)`
-   Delegates to `find_ref`, then to the internal `scan_for_target(...)`.
-
-`Adapter::discover(filter, timeout)` follows the same filtering rules, but keeps
-collecting matching peripherals until the scan window ends.
-
-3. `scan_for_target(...)`
-   Starts scanning with `filter.service_uuids` as the OS-level filter.
-
-4. `ScanFilter::matches(name, address)`
-   Applies app-level filtering for `name_patterns` and `addr_patterns`.
-
-5. `Peripheral::new(...)`
-   Wraps the discovered `bluest` device plus scan-time properties into a
-   `Peripheral`.
-
-6. `Peripheral::connect()`
-   Calls the underlying adapter to connect and returns a `Connection`.
-
-7. `Connection::into_gatt()`
-   Hands the live link to the GATT layer and builds a `Client`.
-
-8. `GattDatabase::discover(device)`
-   Discovers services and characteristics and caches them for later UUID lookup.
-
-9. `Client`
-   Handles read, write, typed read/write, notifications, and characteristic
-   enumeration.
-
-In short:
+Single-device convenience flow:
 
 ```text
 Adapter::default
@@ -92,11 +67,29 @@ Adapter::default
   -> Client
 ```
 
+Multi-device selection flow:
+
+```text
+Adapter::default
+  -> Adapter::discover
+  -> scan_for_targets
+  -> ScanFilter::matches
+  -> Peripheral[]
+  -> Selector::select
+  -> Peripheral
+  -> Peripheral::connect
+  -> Connection
+  -> Connection::into_gatt
+  -> GattDatabase::discover
+  -> Client
+```
+
 ## One-line Memory Map
 
 - `filter.rs`: filter who
 - `adapter.rs`: go find who
 - `peripheral.rs`: found who
+- `selection.rs`: choose who
 - `connection.rs`: connected to who
 - `db.rs`: remember which GATT items it has
 - `client.rs`: actually read and write it
@@ -111,7 +104,15 @@ Root exports:
 pub use bluest::Uuid;
 pub use bluest::btuuid::BluetoothUuidExt;
 pub use error::BtleplusError;
-pub use gap::{Adapter, Connection, Peripheral, PeripheralProperties, ScanFilter};
+pub use gap::{
+    Adapter,
+    Connection,
+    ManufacturerData,
+    Peripheral,
+    PeripheralProperties,
+    ScanFilter,
+    Selector,
+};
 pub use gatt::{Client, GattDatabase, Result};
 ```
 
@@ -129,6 +130,7 @@ let filter = ScanFilter::default()
     .with_addr_patterns(["001122", "aabbcc"])
     .with_service_uuid(Uuid::from_u16(0x180F))
     .with_service_uuids([Uuid::from_u16(0x180F), Uuid::from_u16(0x180D)])
+    .with_manufacturer_company_id(0xFFFF)
     .with_scan_interval_secs(3);
 ```
 
@@ -138,6 +140,9 @@ Matching rules:
 - `addr_patterns`: prefix or exact match, empty means match all
 - name/address use OR logic
 - `service_uuids`: passed down to OS scanning
+- `manufacturer_company_ids`: hard filter during scanning
+- `with_manufacturer_data(...)`: hard filter during scanning
+- `filter(...)`: advanced hard filter over the full `PeripheralProperties` snapshot
 
 ### `Adapter`
 
@@ -170,8 +175,36 @@ pub fn id(&self) -> &str
 - `id`
 - `local_name`
 - `advertised_services`
+- `manufacturer_data`
+- `service_data`
 - `rssi`
 - `is_connectable`
+
+### `Selector`
+
+Used when one scan window may return multiple matching peripherals and the
+caller must choose one before connecting.
+
+Common builder methods:
+
+```rust
+pub fn prefer_connectable(self) -> Self
+pub fn prefer_strongest_signal(self) -> Self
+pub fn prefer_id(self, id: impl Into<String>) -> Self
+pub fn prefer_local_name(self, name: impl Into<String>) -> Self
+pub fn prefer_manufacturer_company_id(self, company_id: u16) -> Self
+pub fn prefer_manufacturer_data<F>(self, predicate: F) -> Self
+pub fn filter<F>(self, predicate: F) -> Self
+pub fn select(&self, peripherals: &[Peripheral]) -> Result<Peripheral, BtleplusError>
+pub fn rank(&self, peripherals: &[Peripheral]) -> Result<Vec<Peripheral>, BtleplusError>
+```
+
+Rule semantics:
+
+- `filter(...)`: post-discovery hard elimination
+- `prefer*`: soft ranking, and earlier chained calls have higher priority
+- `select(...)`: returns the highest-ranked surviving peripheral
+- `rank(...)`: returns the full ranked list
 
 ### `Connection`
 
@@ -205,10 +238,10 @@ pub fn into_connection(self) -> Connection
 pub fn database(&self) -> &GattDatabase
 pub async fn rediscover(&mut self) -> Result<()>
 pub async fn read(&self, uuid: Uuid) -> Result<Vec<u8>>
-pub async fn read_string(&self, uuid: Uuid) -> Result<String>
-pub async fn read_typed<T>(&self, uuid: Uuid) -> Result<T>
+pub async fn read_to_string(&self, uuid: Uuid) -> Result<String>
+pub async fn read_to<T>(&self, uuid: Uuid) -> Result<T>
 pub async fn write(&self, uuid: Uuid, data: &[u8], with_response: bool) -> Result<()>
-pub async fn write_typed<T>(&self, uuid: Uuid, value: &T, with_response: bool) -> Result<()>
+pub async fn write_from<T>(&self, uuid: Uuid, value: &T, with_response: bool) -> Result<()>
 pub async fn notifications(&self, uuid: Uuid) -> Result<impl Stream<Item = Result<Vec<u8>>> + '_>
 pub async fn discovered_characteristics(&self) -> Result<impl Stream<Item = Result<bluest::Characteristic>>>
 pub fn num_services(&self) -> usize
@@ -244,6 +277,7 @@ pub enum BtleplusError {
     Timeout,
     NotConnected,
     InvalidOperation(String),
+    SelectionFailed(String),
     Deserialize(String),
     Serialize(String),
 }
@@ -253,20 +287,38 @@ pub enum BtleplusError {
 
 ```rust
 use std::time::Duration;
-use btleplus::{Adapter, ScanFilter, Uuid, BluetoothUuidExt};
+use btleplus::{Adapter, ScanFilter, Selector, Uuid, BluetoothUuidExt};
 
 let adapter = Adapter::default().await?;
 
 let filter = ScanFilter::default()
     .with_name_pattern("hello-espcx")
-    .with_service_uuid(Uuid::from_u16(0x180F));
+    .with_service_uuid(Uuid::from_u16(0x180F))
+    .with_manufacturer_company_id(0xFFFF);
 
-let peripheral = adapter.find(filter, Duration::from_secs(30)).await?;
+// Discover all candidate devices that pass the scan-time filters.
+let peripherals = adapter.discover(filter, Duration::from_secs(30)).await?;
+
+// Build a selector, then apply it to the discovered peripherals.
+let selector = Selector::default()
+    .prefer_connectable()
+    .prefer_strongest_signal();
+
+// Rank the surviving candidates.
+let ranked = peripherals.rank_with(&selector)?;
+
+// Inspect the full ranked device list if you want to drive a CLI or UI.
+println!("{}", ranked.display_lines());
+
+// Auto-select the first-ranked candidate.
+let peripheral = peripherals.select_with(&selector)?;
+
 let connection = peripheral.connect().await?;
 let gatt = connection.into_gatt().await?;
 
 let battery_uuid = Uuid::from_u16(0x2A19);
 let level = gatt.read(battery_uuid).await?;
+println!("battery={}", level[0]);
 
 let mut stream = gatt.notifications(battery_uuid).await?;
 ```
@@ -274,6 +326,8 @@ let mut stream = gatt.notifications(battery_uuid).await?;
 ## Notes
 
 1. Windows only. The crate is guarded by `#![cfg(windows)]`.
-2. `ScanFilter` mixes OS-level service UUID filtering with app-level name/address matching.
-3. `Client` caches discovered characteristics. Call `rediscover()` if the remote GATT layout may have changed.
-4. Typed reads/writes use `postcard`, which keeps the API friendly for embedded peers.
+2. `ScanFilter` owns the strongest scan-time filters, including manufacturer-data-based elimination.
+3. `Selector` is the recommended way to rank and choose among already-relevant candidates.
+4. `Client` caches discovered characteristics. Call `rediscover()` if the remote GATT layout may have changed.
+5. Typed reads/writes use `postcard` for custom payload structs.
+6. Standard BLE characteristic values should usually be parsed directly instead of being wrapped in `postcard`.

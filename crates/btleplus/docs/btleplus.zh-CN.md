@@ -2,14 +2,14 @@
 
 基于 `bluest` 构建的跨平台 BLE 中心库（Central）。
 
-## 概述
+## 概览
 
-`btleplus` 将 BLE 概念分为两层：
+`btleplus` 将 BLE 概念分成两层：
 
-- `gap`：发现设备、过滤、连接生命周期管理
+- `gap`：发现、过滤、选择、连接生命周期管理
 - `gatt`：服务发现缓存、读、写、通知
 
-推荐流程：
+单设备快速路径：
 
 ```rust
 use std::time::Duration;
@@ -26,55 +26,33 @@ let connection = peripheral.connect().await?;
 let gatt = connection.into_gatt().await?;
 ```
 
-如果你想在一个扫描时间窗内收集所有匹配设备，可以使用：
+多设备产品路径：
 
 ```rust
-let peripherals = adapter.discover(filter, Duration::from_secs(30)).await?;
-```
+use std::time::Duration;
+use btleplus::{
+    Adapter, PeripheralSelectionExt, ScanFilter, Selector, Uuid, BluetoothUuidExt,
+};
 
-## 调用路径
-
-应用代码构建连接时：
-
-```rust
 let adapter = Adapter::default().await?;
-let peripheral = adapter.find(filter, timeout).await?;
+
+let filter = ScanFilter::default()
+    .with_name_pattern("hello-espcx")
+    .with_service_uuid(Uuid::from_u16(0x180F));
+
+let peripherals = adapter.discover(filter, Duration::from_secs(30)).await?;
+let selector = Selector::default()
+    .prefer_connectable()
+    .prefer_strongest_signal();
+let peripheral = peripherals.select_with(&selector)?;
+
 let connection = peripheral.connect().await?;
 let gatt = connection.into_gatt().await?;
 ```
 
-内部流程如下：
+## 调用路径
 
-1. `Adapter::default()`
-   打开系统默认蓝牙适配器。
-
-2. `Adapter::find(filter, timeout)`
-   委托给 `find_ref`，再委托给内部 `scan_for_target(...)`。
-
-`Adapter::discover(filter, timeout)` 使用同样的过滤规则，但会在整个扫描时间窗内持续收集所有匹配到的外设。
-
-3. `scan_for_target(...)`
-   以 `filter.service_uuids` 作为 OS 级别过滤器开始扫描。
-
-4. `ScanFilter::matches(name, address)`
-   对 `name_patterns` 和 `addr_patterns` 执行应用层过滤。
-
-5. `Peripheral::new(...)`
-   将发现的 `bluest` device 和扫描时的属性封装成 `Peripheral`。
-
-6. `Peripheral::connect()`
-   调用底层适配器连接，返回 `Connection`。
-
-7. `Connection::into_gatt()`
-   将活动链路移交给 GATT 层，构建 `Client`。
-
-8. `GattDatabase::discover(device)`
-   发现服务和特征值，并缓存供后续 UUID 查询。
-
-9. `Client`
-   处理读、写、类型化读写、通知以及特征值枚举。
-
-简图：
+单设备便利路径：
 
 ```text
 Adapter::default
@@ -89,16 +67,34 @@ Adapter::default
   -> Client
 ```
 
+多设备选择路径：
+
+```text
+Adapter::default
+  -> Adapter::discover
+  -> scan_for_targets
+  -> ScanFilter::matches
+  -> Peripheral[]
+  -> Selector::select
+  -> Peripheral
+  -> Peripheral::connect
+  -> Connection
+  -> Connection::into_gatt
+  -> GattDatabase::discover
+  -> Client
+```
+
 ## 一句话记忆
 
 - `filter.rs`：过滤谁
 - `adapter.rs`：去找谁
 - `peripheral.rs`：找到了谁
+- `selection.rs`：选谁
 - `connection.rs`：连上了谁
 - `db.rs`：记住它有哪些 GATT 项
 - `client.rs`：真正读写它
 - `error.rs`：出错怎么说
-- `lib.rs`：对外暴露的公共接口
+- `lib.rs`：对外暴露哪些公共接口
 
 ## 公开 API
 
@@ -108,7 +104,15 @@ Adapter::default
 pub use bluest::Uuid;
 pub use bluest::btuuid::BluetoothUuidExt;
 pub use error::BtleplusError;
-pub use gap::{Adapter, Connection, Peripheral, PeripheralProperties, ScanFilter};
+pub use gap::{
+    Adapter,
+    Connection,
+    ManufacturerData,
+    Peripheral,
+    PeripheralProperties,
+    ScanFilter,
+    Selector,
+};
 pub use gatt::{Client, GattDatabase, Result};
 ```
 
@@ -116,7 +120,7 @@ pub use gatt::{Client, GattDatabase, Result};
 
 ### `ScanFilter`
 
-应用层扫描过滤器，带 OS 级别的服务 UUID 过滤。
+应用层扫描过滤器，叠加了 OS 级别的服务 UUID 过滤。
 
 ```rust
 let filter = ScanFilter::default()
@@ -126,19 +130,23 @@ let filter = ScanFilter::default()
     .with_addr_patterns(["001122", "aabbcc"])
     .with_service_uuid(Uuid::from_u16(0x180F))
     .with_service_uuids([Uuid::from_u16(0x180F), Uuid::from_u16(0x180D)])
+    .with_manufacturer_company_id(0xFFFF)
     .with_scan_interval_secs(3);
 ```
 
 匹配规则：
 
-- `name_patterns`：前缀匹配或精确匹配，空表示匹配所有
-- `addr_patterns`：前缀匹配或精确匹配，空表示匹配所有
-- name/address 之间是 OR 逻辑
-- `service_uuids`：透传给操作系统扫描
+- `name_patterns`：前缀或精确匹配，空表示匹配全部
+- `addr_patterns`：前缀或精确匹配，空表示匹配全部
+- `name` 和 `addr` 之间是 OR 逻辑
+- `service_uuids`：透传给底层 OS 扫描过滤
+- `manufacturer_company_ids`：扫描阶段的硬过滤
+- `with_manufacturer_data(...)`：扫描阶段的硬过滤
+- `filter(...)`：针对完整 `PeripheralProperties` 的高级硬过滤
 
 ### `Adapter`
 
-系统蓝牙适配器的包装器。
+系统蓝牙适配器包装器。
 
 关键方法：
 
@@ -151,7 +159,7 @@ pub async fn connect_with_filter(&self, filter: ScanFilter, timeout: Duration) -
 
 ### `Peripheral`
 
-表示连接前已发现的设备。
+表示扫描到但尚未连接的设备。
 
 关键方法：
 
@@ -162,17 +170,45 @@ pub fn local_name(&self) -> Option<&str>
 pub fn id(&self) -> &str
 ```
 
-`PeripheralProperties` 包含扫描时的元数据：
+`PeripheralProperties` 包含扫描时可见的元数据：
 
-- `id`：设备标识符
-- `local_name`：广播的本地名称
-- `advertised_services`：广播的服务列表
-- `rssi`：信号强度（dBm）
-- `is_connectable`：设备是否报告为可连接
+- `id`
+- `local_name`
+- `advertised_services`
+- `manufacturer_data`
+- `service_data`
+- `rssi`
+- `is_connectable`
+
+### `Selector`
+
+当一次扫描返回多台候选设备，而调用方需要在连接前先选一台时，
+推荐使用 `Selector`。
+
+常用 builder 方法：
+
+```rust
+pub fn prefer_connectable(self) -> Self
+pub fn prefer_strongest_signal(self) -> Self
+pub fn prefer_id(self, id: impl Into<String>) -> Self
+pub fn prefer_local_name(self, name: impl Into<String>) -> Self
+pub fn prefer_manufacturer_company_id(self, company_id: u16) -> Self
+pub fn prefer_manufacturer_data<F>(self, predicate: F) -> Self
+pub fn filter<F>(self, predicate: F) -> Self
+pub fn select(&self, peripherals: &[Peripheral]) -> Result<Peripheral, BtleplusError>
+pub fn rank(&self, peripherals: &[Peripheral]) -> Result<Vec<Peripheral>, BtleplusError>
+```
+
+规则语义：
+
+- `filter(...)`：发现之后的硬过滤
+- `prefer*`：软偏好，只影响排序，且越早链式调用优先级越高
+- `select(...)`：返回剩余候选里排名最高的那台
+- `rank(...)`：返回完整的排序列表
 
 ### `Connection`
 
-表示已连接的 GAP 链路。连接生命周期管理在此层。
+表示已连接的 GAP 链路。连接生命周期管理留在这一层。
 
 关键方法：
 
@@ -192,7 +228,7 @@ pub fn peripheral(&self) -> &PeripheralProperties
 
 ### `Client`
 
-基于活动 `Connection` 构建的 GATT 客户端。
+基于活跃 `Connection` 构建的 GATT 客户端。
 
 关键方法：
 
@@ -202,10 +238,10 @@ pub fn into_connection(self) -> Connection
 pub fn database(&self) -> &GattDatabase
 pub async fn rediscover(&mut self) -> Result<()>
 pub async fn read(&self, uuid: Uuid) -> Result<Vec<u8>>
-pub async fn read_string(&self, uuid: Uuid) -> Result<String>
-pub async fn read_typed<T>(&self, uuid: Uuid) -> Result<T>
+pub async fn read_to_string(&self, uuid: Uuid) -> Result<String>
+pub async fn read_to<T>(&self, uuid: Uuid) -> Result<T>
 pub async fn write(&self, uuid: Uuid, data: &[u8], with_response: bool) -> Result<()>
-pub async fn write_typed<T>(&self, uuid: Uuid, value: &T, with_response: bool) -> Result<()>
+pub async fn write_from<T>(&self, uuid: Uuid, value: &T, with_response: bool) -> Result<()>
 pub async fn notifications(&self, uuid: Uuid) -> Result<impl Stream<Item = Result<Vec<u8>>> + '_>
 pub async fn discovered_characteristics(&self) -> Result<impl Stream<Item = Result<bluest::Characteristic>>>
 pub fn num_services(&self) -> usize
@@ -219,7 +255,7 @@ pub fn num_characteristics(&self) -> usize
 
 ### `GattDatabase`
 
-服务和特征值发现的缓存结果。
+服务和特征发现结果的本地缓存。
 
 关键方法：
 
@@ -234,15 +270,16 @@ pub async fn discovered_characteristics(&self) -> Result<impl Stream<Item = Resu
 
 ```rust
 pub enum BtleplusError {
-    Bluetooth(String),          // 蓝牙子系统错误
-    DeviceNotFound(String),      // 扫描未找到设备
-    ConnectionFailed(String),    // 连接设备失败
-    Io(std::io::Error),         // IO 错误
-    Timeout,                     // 操作超时
-    NotConnected,                // 需要连接但未连接
-    InvalidOperation(String),    // 无效操作（如找不到特征值）
-    Deserialize(String),         // 反序列化错误
-    Serialize(String),           // 序列化错误
+    Bluetooth(String),
+    DeviceNotFound(String),
+    ConnectionFailed(String),
+    Io(std::io::Error),
+    Timeout,
+    NotConnected,
+    InvalidOperation(String),
+    SelectionFailed(String),
+    Deserialize(String),
+    Serialize(String),
 }
 ```
 
@@ -250,27 +287,47 @@ pub enum BtleplusError {
 
 ```rust
 use std::time::Duration;
-use btleplus::{Adapter, ScanFilter, Uuid, BluetoothUuidExt};
+use btleplus::{Adapter, ScanFilter, Selector, Uuid, BluetoothUuidExt};
 
 let adapter = Adapter::default().await?;
 
 let filter = ScanFilter::default()
     .with_name_pattern("hello-espcx")
-    .with_service_uuid(Uuid::from_u16(0x180F));
+    .with_service_uuid(Uuid::from_u16(0x180F))
+    .with_manufacturer_company_id(0xFFFF);
 
-let peripheral = adapter.find(filter, Duration::from_secs(30)).await?;
+// 先扫描出所有通过扫描期过滤的候选设备
+let peripherals = adapter.discover(filter, Duration::from_secs(30)).await?;
+
+// 先定义选择器，链式顺序就是偏好优先级
+let selector = Selector::default()
+    .prefer_connectable()
+    .prefer_strongest_signal();
+
+// 再把选择器作用到候选设备上
+let ranked = peripherals.rank_with(&selector)?;
+
+// 如果你要做 CLI / UI，可直接打印完整排序列表
+println!("{}", ranked.display_lines());
+
+// 自动取第一名
+let peripheral = peripherals.select_with(&selector)?;
+
 let connection = peripheral.connect().await?;
 let gatt = connection.into_gatt().await?;
 
 let battery_uuid = Uuid::from_u16(0x2A19);
 let level = gatt.read(battery_uuid).await?;
+println!("battery={}", level[0]);
 
 let mut stream = gatt.notifications(battery_uuid).await?;
 ```
 
 ## 注意事项
 
-1. 目前仅支持 Windows。crate 以 `#![cfg(windows)]` 保护。
-2. `ScanFilter` 将 OS 级别的服务 UUID 过滤与应用层的名称/地址匹配混合使用。
-3. `Client` 会缓存已发现的特征值。如果远程 GATT 布局可能已更改，请调用 `rediscover()`。
-4. 类型化读写使用 `postcard`，使 API 对嵌入式对端保持友好。
+1. 目前仅支持 Windows。crate 受 `#![cfg(windows)]` 保护。
+2. `ScanFilter` 负责最强的一层扫描期过滤，包括厂商数据过滤。
+3. 当一次扫描返回多台候选设备时，推荐使用 `Selector` 对“已经相关”的候选集做排序和选择。
+4. `Client` 会缓存已发现的特征值。如果远端 GATT 布局可能已更改，请调用 `rediscover()`。
+5. 自定义结构的类型化读写默认使用 `postcard`，对嵌入式对端更友好。
+6. 标准 BLE 特征值通常应直接按规范解析，不要为了统一而额外包一层 `postcard`。

@@ -27,6 +27,7 @@ facade for this project’s UUIDs and payload formats.
 
 - `src/main.rs`: program entry, reconnect loop, runtime behavior
 - `src/lib.rs`: `BleSession` and connection helpers
+- `src/tests.rs`: unit tests for product-specific selection and payload logic
 - `tests/hil_real.rs`: real-hardware integration tests
 
 ## Connection Flow
@@ -35,19 +36,30 @@ facade for this project’s UUIDs and payload formats.
 
 1. Build a `ScanFilter` for the peripheral name and battery service.
 2. Open `btleplus::Adapter`.
-3. Find a matching `btleplus::Peripheral`.
-4. Connect and get a `btleplus::Connection`.
-5. Convert that into a `btleplus::Client`.
-6. Build `BleSession` with the fixed UUID set from `hello-ble-common`.
+3. Discover all matching `btleplus::Peripheral` values.
+4. Build a `btleplus::Selector`, then apply it to the discovered peripheral collection.
+5. Connect and get a `btleplus::Connection`.
+6. Convert that into a `btleplus::Client`.
+7. Build `BleSession` with the fixed UUID set from `hello-ble-common`.
 
 In code terms:
 
 ```rust
 let adapter = Adapter::default().await?;
-let peripheral = adapter.find(filter, timeout).await?;
+let peripherals = adapter.discover(filter, timeout).await?;
+let selector = Selector::default()
+    .prefer_connectable()
+    .prefer_strongest_signal();
+let peripheral = peripherals.select_with(&selector)?;
 let connection = peripheral.connect().await?;
 let gatt = connection.into_gatt().await?;
 ```
+
+Recommended style:
+
+- keep scan-time rules in `ScanFilter`
+- keep ranking/selection rules in `Selector`
+- prefer collection-oriented usage such as `peripherals.select_with(&selector)` and `peripherals.rank_with(&selector)`
 
 ## Core Type
 
@@ -161,5 +173,11 @@ Stats are validated with `read_bulk_stats()` and reset with
 - bulk upload verification
 - bulk notify-stream verification
 - throughput reporting
+
+`src/tests.rs` contains fast unit tests for:
+
+- manufacturer payload decoding
+- product scan-filter configuration
+- product identity matching rules
 
 These tests require a real ESP32-C6 peripheral running the matching firmware.

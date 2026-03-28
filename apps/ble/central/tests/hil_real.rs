@@ -57,7 +57,9 @@ async fn esp32c6_end_to_end_hil() -> anyhow::Result<()> {
 
     // Bulk: upload test pattern
     println!("[hil] upload {} bytes", BULK_TRANSFER_TOTAL_BYTES);
-    session.upload_test_pattern(BULK_TRANSFER_TOTAL_BYTES).await?;
+    session
+        .upload_test_pattern(BULK_TRANSFER_TOTAL_BYTES)
+        .await?;
     let stats = session.read_bulk_stats().await?;
     println!("[hil] stats after upload: {:?}", stats);
 
@@ -71,7 +73,9 @@ async fn esp32c6_end_to_end_hil() -> anyhow::Result<()> {
     println!("[hil] receive bulk stream");
 
     let stats = {
-        session.receive_bulk_stream(BULK_TRANSFER_TOTAL_BYTES, BULK_TIMEOUT).await?;
+        session
+            .receive_bulk_stream(BULK_TRANSFER_TOTAL_BYTES, BULK_TIMEOUT)
+            .await?;
         session.read_bulk_stats().await?
     };
     println!("[hil] stats after stream: {:?}", stats);
@@ -92,7 +96,9 @@ async fn esp32c6_bulk_stress_hil() -> anyhow::Result<()> {
         );
         session.reset_bulk_stats().await?;
         let upload_started = Instant::now();
-        session.upload_test_pattern(BULK_TRANSFER_TOTAL_BYTES).await?;
+        session
+            .upload_test_pattern(BULK_TRANSFER_TOTAL_BYTES)
+            .await?;
         print_throughput(
             "upload",
             BULK_TRANSFER_TOTAL_BYTES,

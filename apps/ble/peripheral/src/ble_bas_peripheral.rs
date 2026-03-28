@@ -58,7 +58,7 @@ use crate::services::initial_bulk_control_value;
 use trouble_host::prelude::*;
 
 use hello_ble_common::{
-    battery, bulk, fill_test_pattern, PERIPHERAL_ADDRESS, PERIPHERAL_NAME,
+    advertisement_identity, battery, bulk, fill_test_pattern, PERIPHERAL_ADDRESS, PERIPHERAL_NAME,
 };
 
 // ============================================================================
@@ -150,11 +150,21 @@ async fn advertise<'values, 'server, C: Controller>(
     server: &'server Server<'values>,
 ) -> Result<GattConnection<'values, 'server, DefaultPacketPool>, BleHostError<C::Error>> {
     let mut advertiser_data = [0; 31];
+    let manufacturer_payload = advertisement_identity::ManufacturerPayload::new(
+        advertisement_identity::PRODUCT_ID_HELLO_ESPCX,
+        advertisement_identity::unit_id_from_address(PERIPHERAL_ADDRESS),
+        0,
+    )
+    .to_bytes();
     let len = AdStructure::encode_slice(
         &[
             AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
             AdStructure::ServiceUuids16(&[battery::SERVICE_UUID16.to_le_bytes()]),
             AdStructure::CompleteLocalName(PERIPHERAL_NAME.as_bytes()),
+            AdStructure::ManufacturerSpecificData {
+                company_identifier: advertisement_identity::DEVELOPMENT_COMPANY_ID,
+                payload: &manufacturer_payload,
+            },
         ],
         &mut advertiser_data[..],
     )?;

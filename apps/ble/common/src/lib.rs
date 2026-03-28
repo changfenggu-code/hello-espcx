@@ -60,6 +60,88 @@ pub mod battery {
 }
 
 // ============================================================================
+// 广播身份摘要（manufacturer_data 规划）
+// ============================================================================
+
+pub mod advertisement_identity {
+    use super::{Deserialize, Serialize};
+
+    /// Manufacturer payload format version (current).
+    pub const VERSION: u8 = 1;
+
+    /// Temporary development company identifier used only for local testing.
+    ///
+    /// Replace this with a real Bluetooth SIG company identifier before
+    /// production use.
+    pub const DEVELOPMENT_COMPANY_ID: u16 = 0xFFFF;
+
+    /// Product identifier for the current hello-espcx product family.
+    pub const PRODUCT_ID_HELLO_ESPCX: u8 = 1;
+
+    /// Byte length of the current payload layout.
+    pub const PAYLOAD_LEN: usize = 7;
+
+    /// Reserved flag bit: device has completed configuration.
+    pub const FLAG_CONFIGURED: u8 = 1 << 0;
+    /// Reserved flag bit: device is bound/claimed.
+    pub const FLAG_BOUND: u8 = 1 << 1;
+    /// Reserved flag bit: device is in test mode.
+    pub const FLAG_TEST_MODE: u8 = 1 << 2;
+    /// Reserved flag bit: device reports low battery.
+    pub const FLAG_LOW_BATTERY: u8 = 1 << 3;
+
+    /// Compact manufacturer payload intended for scan-time device selection.
+    ///
+    /// Layout (V1):
+    /// - version: u8
+    /// - product_id: u8
+    /// - unit_id: u32
+    /// - flags: u8
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+    pub struct ManufacturerPayload {
+        pub version: u8,
+        pub product_id: u8,
+        pub unit_id: u32,
+        pub flags: u8,
+    }
+
+    impl ManufacturerPayload {
+        /// Create a payload with the current protocol version baked in.
+        /// version 由 `VERSION` 常量决定，调用方无需关心。
+        pub const fn new(product_id: u8, unit_id: u32, flags: u8) -> Self {
+            Self {
+                version: VERSION,
+                product_id,
+                unit_id,
+                flags,
+            }
+        }
+
+        pub const fn has_flag(&self, flag: u8) -> bool {
+            self.flags & flag != 0
+        }
+
+        pub const fn to_bytes(self) -> [u8; PAYLOAD_LEN] {
+            let unit_id = self.unit_id.to_le_bytes();
+            [
+                self.version,
+                self.product_id,
+                unit_id[0],
+                unit_id[1],
+                unit_id[2],
+                unit_id[3],
+                self.flags,
+            ]
+        }
+    }
+
+    /// Derive a stable 32-bit unit identifier from a 6-byte BLE address.
+    pub const fn unit_id_from_address(address: [u8; 6]) -> u32 {
+        u32::from_le_bytes([address[0], address[1], address[2], address[3]])
+    }
+}
+
+// ============================================================================
 // 服务二：device_info（标准 BLE）
 //
 // 用途：返回静态设备信息（厂商、型号、固件版本等）。

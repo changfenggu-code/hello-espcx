@@ -5,24 +5,17 @@
 //!
 //! | Method | Description |
 //! |--------|-------------|
-//! | [`Connection::connect`] | Connect by device name. 按设备名连接。 |
-//! | [`Connection::connect_by_address`] | Connect by address. 按地址连接。 |
-//! | [`Connection::connect_by_service`] | Connect by advertised service UUID. 按广播的服务 UUID 连接。 |
-//! | [`Connection::connect_with_filter`] | Connect with a custom scan filter. 使用自定义扫描过滤器连接。 |
 //! | [`Connection::into_gatt`] | Convert to GATT client. 转换为 GATT 客户端。 |
 //! | [`Connection::is_connected`] | Check if still connected. 检查是否仍连接。 |
 //! | [`Connection::disconnect`] | Disconnect. 断开连接。 |
 //! | [`Connection::reconnect`] | Reconnect to the same device. 重连到同一设备。 |
-//! | [`Connection::peripheral`] | Get scan-time properties. 获取扫描时的属性。 |
-//! | [`Connection::id`] | Get device identifier. 获取设备标识符。 |
-//! | [`Connection::local_name`] | Get advertised local name. 获取广播的本地名称。 |
+//! | [`Connection::peripheral`] | Get scan-time properties (use for id/name/etc.). 获取扫描时的属性（用于 id/name 等）。 |
 
-use bluest::{Device, Uuid};
-use std::time::Duration;
+use bluest::Device;
 
 use crate::{error::BtleplusError, gatt::Client};
 
-use super::{Adapter, PeripheralProperties, ScanFilter};
+use super::{Adapter, PeripheralProperties};
 
 /// Connected peripheral link.
 /// 已连接的外设链路。
@@ -40,46 +33,14 @@ pub struct Connection {
 }
 
 impl Connection {
+    /// Create a new Connection from its components.
+    /// 从组件创建新的 Connection。
     pub(crate) fn new(adapter: Adapter, device: Device, peripheral: PeripheralProperties) -> Self {
         Self {
             adapter,
             device,
             peripheral,
         }
-    }
-
-    /// Connect to a peripheral by name.
-    /// 按名称连接到外设。
-    pub async fn connect(name: &str, timeout: Duration) -> Result<Self, BtleplusError> {
-        let filter = ScanFilter::default().with_name_pattern(name);
-        Self::connect_with_filter(filter, timeout).await
-    }
-
-    /// Connect to a peripheral by address.
-    /// 按地址连接到外设。
-    pub async fn connect_by_address(
-        address: &str,
-        timeout: Duration,
-    ) -> Result<Self, BtleplusError> {
-        let filter = ScanFilter::default().with_addr_pattern(address);
-        Self::connect_with_filter(filter, timeout).await
-    }
-
-    /// Connect to a peripheral advertising a service UUID.
-    /// 连接到广播特定服务 UUID 的外设。
-    pub async fn connect_by_service(uuid: Uuid, timeout: Duration) -> Result<Self, BtleplusError> {
-        let filter = ScanFilter::default().with_service_uuid(uuid);
-        Self::connect_with_filter(filter, timeout).await
-    }
-
-    /// Scan and connect using a custom filter.
-    /// 使用自定义过滤器扫描并连接。
-    pub async fn connect_with_filter(
-        filter: ScanFilter,
-        timeout: Duration,
-    ) -> Result<Self, BtleplusError> {
-        let adapter = Adapter::default().await?;
-        adapter.connect_with_filter(filter, timeout).await
     }
 
     /// Convert this live connection into a GATT client.
@@ -119,6 +80,8 @@ impl Connection {
         &self.peripheral
     }
 
+    /// Access the underlying platform device handle.
+    /// 访问底层平台设备句柄。
     pub(crate) fn device(&self) -> &Device {
         &self.device
     }

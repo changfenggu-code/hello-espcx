@@ -63,10 +63,12 @@ mod error;
 pub mod gap;
 pub mod gatt;
 
-// Re-exports
-// 重新导出
+// Re-exports / 重新导出
 pub use bluest::Uuid;
 pub use bluest::btuuid::BluetoothUuidExt;
 pub use error::BtleplusError;
-pub use gap::{Adapter, Connection, Peripheral, PeripheralProperties, ScanFilter};
+pub use gap::{
+    Adapter, Connection, ManufacturerData, Peripheral, PeripheralDisplayExt, PeripheralDisplayList,
+    PeripheralProperties, PeripheralSelectionExt, ScanFilter, Selector,
+};
 pub use gatt::{Client, GattDatabase, Result};
