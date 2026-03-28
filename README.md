@@ -4,8 +4,8 @@
 
 `hello-espcx` is a compact end-to-end BLE example built with Rust:
 
-- `peripheral/` runs on an ESP32-C6 and exposes a Battery Service GATT server
-- `central/` runs on a desktop machine and scans, connects, subscribes, and reads characteristic values
+- `apps/ble/peripheral/` runs on an ESP32-C6 and exposes a Battery Service GATT server
+- `apps/ble/central/` runs on a desktop machine and scans, connects, subscribes, and reads characteristic values
 
 The current workflow is centered on ESP32-C6 firmware development plus a Windows BLE central application.
 
@@ -13,9 +13,9 @@ The current workflow is centered on ESP32-C6 firmware development plus a Windows
 
 The project is split into two executable crates:
 
-- `common/`: shared BLE constants used by both applications
-- `peripheral/`: embedded BLE peripheral based on `esp-hal`, `esp-radio`, `esp-rtos`, and `trouble-host`
-- `central/`: desktop BLE central based on `btleplug` and `tokio`
+- `apps/ble/common/`: shared BLE constants used by both applications
+- `apps/ble/peripheral/`: embedded BLE peripheral based on `esp-hal`, `esp-radio`, `esp-rtos`, and `trouble-host`
+- `apps/ble/central/`: desktop BLE central based on `btleplus` and `tokio`
 
 Local path dependencies under `contrib/esp-hal/` are vendored through a git submodule, so the repository can be developed against a pinned embedded stack revision.
 
@@ -23,9 +23,10 @@ Local path dependencies under `contrib/esp-hal/` are vendored through a git subm
 
 ```text
 hello_espcx/
-|- common/              # Shared BLE constants
-|- peripheral/          # ESP32-C6 BLE peripheral
-|- central/             # Desktop BLE central application
+|- apps/ble/common/     # Shared BLE constants
+|- apps/ble/peripheral/ # ESP32-C6 BLE peripheral
+|- apps/ble/central/    # Desktop BLE central application
+|- crates/btleplus/   # Cross-platform BLE client library used by central
 |- contrib/esp-hal/     # esp-rs submodule used as local dependencies
 |- llm/                 # Reference code and upstream examples
 |- justfile             # Common build and flash commands
@@ -159,9 +160,9 @@ If you prefer using Cargo directly:
 
 ```bash
 # Peripheral
-cd peripheral
-cargo check
-cargo build
+cd apps/ble/peripheral
+cargo check --target riscv32imac-unknown-none-elf
+cargo build --target riscv32imac-unknown-none-elf
 
 # Central
 cd ../central
@@ -171,19 +172,20 @@ cargo run
 
 ## Toolchain and Platform Notes
 
-### `peripheral/`
+### `apps/ble/peripheral/`
 
-- uses the `nightly` toolchain via `peripheral/rust-toolchain.toml`
+- uses the `nightly` toolchain via `apps/ble/peripheral/rust-toolchain.toml`
 - targets `riscv32imac-unknown-none-elf`
-- enables `build-std = ["alloc", "core"]` in `peripheral/.cargo/config.toml`
-- entry point: `peripheral/src/main.rs`
-- GATT server definition: `peripheral/src/ble_bas_peripheral.rs`
+- does not currently check in `apps/ble/peripheral/.cargo/config.toml`
+- when running Cargo directly, pass `--target riscv32imac-unknown-none-elf` explicitly, or use the root `just` commands
+- entry point: `apps/ble/peripheral/src/main.rs`
+- GATT server definition: `apps/ble/peripheral/src/ble_bas_peripheral.rs`
 
-### `central/`
+### `apps/ble/central/`
 
 - is a standard desktop Rust application
 - is currently organized around a Windows BLE workflow
-- entry point: `central/src/main.rs`
+- entry point: `apps/ble/central/src/main.rs`
 
 ## IDE Notes
 
@@ -207,8 +209,8 @@ The repository currently documents the following USB UART pins:
 At the current repository state, the following commands pass:
 
 ```bash
-cargo check -p hello-espcx-central
-cd peripheral && cargo check
+cargo check -p hello-ble-central
+cd apps/ble/peripheral && cargo check --target riscv32imac-unknown-none-elf
 ```
 
 Hardware flashing, BLE discovery, and live notification flow should still be validated on real devices when you change runtime behavior.

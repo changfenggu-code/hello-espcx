@@ -1,4 +1,10 @@
 {
+  "rust-analyzer.linkedProjects": [
+    "Cargo.toml",
+    "apps/ble/peripheral/Cargo.toml"
+  ],
+  "rust-analyzer.cargo.allTargets": false,
+  "rust-analyzer.check.allTargets": false,
   "rust-analyzer.files.excludeItems": [
     "contrib/esp-hal/xtensa-lx/**",
     "contrib/esp-hal/xtensa-lx-rt/**",

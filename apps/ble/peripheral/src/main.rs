@@ -4,6 +4,7 @@
 #![no_main]
 
 mod ble_bas_peripheral;
+mod services;
 
 use embassy_executor::Spawner;
 use esp_alloc as _;
@@ -28,24 +29,24 @@ esp_bootloader_esp_idf::esp_app_desc!();
 #[esp_rtos::main]
 async fn main(_s: Spawner) {
     rtt_init_print!();
-
+    // === 核心逻辑 ===
+    // 1. 初始化 ESP32 外设
     rprintln!("[init] {} peripheral starting...", PERIPHERAL_NAME);
-    rprintln!("[init] configuring CPU clock...");
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
 
-    rprintln!("[init] setting up heap allocator (72KB)...");
-    esp_alloc::heap_allocator!(size: 72 * 1024);
-
+    // 2. 配置 RTOS 调度器（embassy 需要 timer + software interrupt）
     rprintln!("[init] configuring timer and software interrupt...");
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
+    // 3. 创建 BLE controller（芯片级 BLE 硬件）
     rprintln!("[init] initializing BLE controller...");
     let bluetooth = peripherals.BT;
     let connector = BleConnector::new(bluetooth, Default::default()).unwrap();
     let controller: ExternalController<_, 1> = ExternalController::new(connector);
 
+    // 4. 启动 BLE 外设（广告 + GATT 服务，进入主循环）
     rprintln!("[init] starting BLE peripheral...");
     ble_bas_peripheral::run(controller).await;
 }

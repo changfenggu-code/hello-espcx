@@ -6,16 +6,16 @@
 
 这是一个 Rust BLE 双端样例：
 
-- `common/` 是共享 BLE 常量 crate
-- `peripheral/` 是 ESP32-C6 外设
-- `central/` 是桌面中心程序
+- `apps/ble/common/` 是共享 BLE 常量 crate
+- `apps/ble/peripheral/` 是 ESP32-C6 外设
+- `apps/ble/central/` 是桌面中心程序
 - `contrib/esp-hal/` 是本地 vendor 子模块
 
 默认把它当成“两端协作 + 一个上游依赖镜像”的仓库，而不是一个可以随便全局重构的普通 workspace。
 
 ## 默认修改边界
 
-- 优先修改 `peripheral/`、`central/`、根目录文档、`justfile`
+- 优先修改 `apps/ble/peripheral/`、`apps/ble/central/`、根目录文档、`justfile`
 - 如果改 BLE 名称、地址或 UUID，优先先看 `common/`
 - 除非任务明确要求，否则不要修改 `contrib/esp-hal/`
 - 除非任务明确要求，否则不要把 `llm/` 里的代码搬进主流程
@@ -23,9 +23,9 @@
 
 ## 目录含义
 
-- `peripheral/`：嵌入式侧主代码
-- `central/`：桌面侧主代码
-- `common/`：两端共享的 BLE 协议常量
+- `apps/ble/peripheral/`：嵌入式侧主代码
+- `apps/ble/central/`：桌面侧主代码
+- `apps/ble/common/`：两端共享的 BLE 协议常量
 - `contrib/esp-hal/`：git submodule，提供 `esp-hal` / `esp-radio` / `esp-rtos` 等本地路径依赖
 - `llm/`：参考实现、样例、上游源码快照
 
@@ -35,9 +35,9 @@
 - 外设固定随机地址：`ff:8f:1a:05:e4:ff`
 - 中心程序按名字 `hello-espcx` 扫描
 - 中心程序读取并订阅 Battery Level 特征值 `0x2A19`
-- 外设入口：`peripheral/src/main.rs`
-- GATT 服务：`peripheral/src/ble_bas_peripheral.rs`
-- 中心程序入口：`central/src/main.rs`
+- 外设入口：`apps/ble/peripheral/src/main.rs`
+- GATT 服务：`apps/ble/peripheral/src/ble_bas_peripheral.rs`
+- 中心程序入口：`apps/ble/central/src/main.rs`
 
 只要你改动广播名、地址、UUID、通知行为，就要默认认为这是跨端改动。
 
@@ -94,8 +94,9 @@ just flash
 
 - 这是 `no_std + no_main` 程序
 - 日志走 `rtt-target`，保持使用 `rprintln!`
-- 工具链由 `peripheral/rust-toolchain.toml` 固定为 `nightly`
-- 构建目标由 `peripheral/.cargo/config.toml` 固定为 `riscv32imac-unknown-none-elf`
+- 工具链由 `apps/ble/peripheral/rust-toolchain.toml` 固定为 `nightly`
+- 外设目标是 `riscv32imac-unknown-none-elf`
+- 当前仓库未提交 `apps/ble/peripheral/.cargo/config.toml`，直接用 Cargo 时需要显式传 `--target riscv32imac-unknown-none-elf`，或优先使用根目录 `just` 命令
 - `build.rs` 里有自定义 linker 友好报错逻辑，不要轻易删掉
 
 ## 修改 central 时要记住
@@ -124,8 +125,8 @@ just flash
 截至 2026-03-24，以下检查已在仓库里跑过并通过：
 
 ```bash
-cargo check -p hello-espcx-central
-cd peripheral && cargo check
+cargo check -p hello-ble-central
+cd apps/ble/peripheral && cargo check --target riscv32imac-unknown-none-elf
 ```
 
 做完改动后，至少回到这条基线之上。

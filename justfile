@@ -78,14 +78,14 @@ clippy-central:
 run-central:
     cargo run
 
-# === winble ===
+# === btleplus ===
 
-[working-directory: "crates/winble"]
-check-winble:
+[working-directory: "crates/btleplus"]
+check-btleplus:
     cargo check
 
-[working-directory: "crates/winble"]
-clippy-winble:
+[working-directory: "crates/btleplus"]
+clippy-btleplus:
     cargo clippy -- -D warnings
 
 # === Hardware ===
@@ -111,7 +111,7 @@ check-all:
 
 clippy:
     just clippy-central
-    just clippy-winble
+    just clippy-btleplus
 
 hil-test-live:
     cargo test -p hello-ble-central --test hil_real esp32c6_end_to_end_hil -- --ignored --nocapture --test-threads=1

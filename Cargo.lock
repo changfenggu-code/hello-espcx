@@ -118,6 +118,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "btleplus"
+version = "0.1.0"
+dependencies = [
+ "bluest",
+ "futures-core",
+ "futures-util",
+ "postcard",
+ "serde",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -423,6 +436,7 @@ name = "hello-ble-central"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "btleplus",
  "futures-util",
  "hello-ble-common",
  "postcard",
@@ -430,7 +444,6 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "winble",
 ]
 
 [[package]]
@@ -1141,19 +1154,6 @@ dependencies = [
  "hashbrown 0.15.5",
  "indexmap",
  "semver",
-]
-
-[[package]]
-name = "winble"
-version = "0.1.0"
-dependencies = [
- "bluest",
- "futures-core",
- "futures-util",
- "postcard",
- "serde",
- "thiserror",
- "tokio",
 ]
 
 [[package]]

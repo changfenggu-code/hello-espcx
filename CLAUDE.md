@@ -2,13 +2,13 @@
 
 这是一个 BLE 双端 Rust 项目：
 
-- `common/`：共享 BLE 常量
-- `peripheral/`：ESP32-C6 外设，`esp-hal` + `esp-radio` + `trouble-host`
-- `central/`：桌面中心程序，`btleplug`
+- `apps/ble/common/`：共享 BLE 常量
+- `apps/ble/peripheral/`：ESP32-C6 外设，`esp-hal` + `esp-radio` + `trouble-host`
+- `apps/ble/central/`：桌面中心程序，`btleplus`
 
 ## 进入仓库后先知道这些
 
-- 主工作目录通常只在 `peripheral/`、`central/`、根目录文档
+- 主工作目录通常只在 `apps/ble/peripheral/`、`apps/ble/central/`、根目录文档
 - 改 BLE 名称、地址、UUID 时先看 `common/`
 - `vendor/esp-hal/` 是 esp-hal 子模块，默认不要改
 - `llm/` 是参考代码，不是主交付路径
@@ -60,11 +60,12 @@ just check
 
 ## 代码提示
 
-- `peripheral/src/main.rs` 是外设入口
-- `peripheral/src/ble_bas_peripheral.rs` 定义 GATT 服务
-- `central/src/main.rs` 是中心程序入口
+- `apps/ble/peripheral/src/main.rs` 是外设入口
+- `apps/ble/peripheral/src/ble_bas_peripheral.rs` 定义 GATT 服务
+- `apps/ble/central/src/main.rs` 是中心程序入口
 - 外设日志使用 `rprintln!`
-- `peripheral/` 使用 `nightly` 和 `riscv32imac-unknown-none-elf`
+- `apps/ble/peripheral/` 使用 `nightly`
+- 直接进入外设目录运行 Cargo 时，显式传 `--target riscv32imac-unknown-none-elf`
 
 ## Codebase Map（`.planning/codebase/`）
 

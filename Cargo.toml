@@ -3,7 +3,7 @@ resolver = "2"
 members = [
     "apps/ble/common",
     "apps/ble/central",
-    "crates/winble",
+    "crates/btleplus",
 ]
 exclude = [
     "apps/ble/peripheral",  # esp-hal conflicts with windows crate's critical-section
