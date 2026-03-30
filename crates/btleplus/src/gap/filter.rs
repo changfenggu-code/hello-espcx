@@ -32,15 +32,7 @@
 use bluest::Uuid;
 use std::sync::Arc;
 
-use super::{ManufacturerData, PeripheralProperties};
-
-/// Function type for filtering by peripheral properties.
-/// 按外设属性过滤的函数类型。
-type PropertiesPredicate = dyn Fn(&PeripheralProperties) -> bool + Send + Sync + 'static;
-
-/// Function type for filtering by manufacturer data.
-/// 按厂商数据过滤的函数类型。
-type ManufacturerPredicate = dyn Fn(&ManufacturerData) -> bool + Send + Sync + 'static;
+use super::peripheral::{ManufacturerData, ManufacturerPredicate, PeripheralProperties, PropertiesPredicate};
 
 /// Scan filter for discovering peripherals.
 /// 用于发现外设的扫描过滤器。

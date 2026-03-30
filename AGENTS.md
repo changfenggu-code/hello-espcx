@@ -207,6 +207,13 @@ just flash
 - 当前仓库未提交 `apps/ble/peripheral/.cargo/config.toml`，直接用 Cargo 时需要显式传 `--target riscv32imac-unknown-none-elf`，或优先使用根目录 `just`
 - `build.rs` 里有自定义 linker 友好报错逻辑，不要轻易删掉
 
+### peripheral 注释与编码约束
+
+- `apps/ble/peripheral/` 下当前正在补充较多中文和双语注释；修改这些文件时，优先做局部编辑，不要为了省事直接整文件重写
+- 如果文件里已有中文注释，默认认为这些注释需要被保留；除非任务明确要求同步改注释，否则不要随手删改
+- 如果读取文件时看到中文乱码，先尝试按 UTF-8 重新查看内容，再判断注释含义，不要把乱码内容当成原文覆盖回文件
+- 做结构重构时，尽量把代码移动和注释移动一起处理，避免把原有中文说明丢失
+
 ## 修改 central 时要记住
 
 - 这是普通桌面 Rust + `tokio` 程序

@@ -155,3 +155,13 @@ impl Peripheral {
         &self.properties.id
     }
 }
+
+/// Function type for filtering by peripheral properties.
+/// 按外设属性过滤的函数类型。
+pub(crate) type PropertiesPredicate =
+    dyn Fn(&PeripheralProperties) -> bool + Send + Sync + 'static;
+
+/// Function type for filtering by manufacturer data.
+/// 按厂商数据过滤的函数类型。
+pub(crate) type ManufacturerPredicate =
+    dyn Fn(&ManufacturerData) -> bool + Send + Sync + 'static;

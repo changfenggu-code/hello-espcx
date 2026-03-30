@@ -37,7 +37,9 @@
 
 use crate::error::BtleplusError;
 
-use super::{ManufacturerData, Peripheral, PeripheralProperties};
+use super::peripheral::{
+    ManufacturerData, ManufacturerPredicate, Peripheral, PeripheralProperties, PropertiesPredicate,
+};
 
 /// Convenience helpers for applying a selector to a peripheral collection.
 /// 将选择器应用到外设集合的便捷方法。
@@ -215,14 +217,6 @@ impl Selector {
     }
 }
 
-/// Function type for filtering by peripheral properties.
-/// 按外设属性过滤的函数类型。
-type PropertiesPredicate = dyn Fn(&PeripheralProperties) -> bool + Send + Sync + 'static;
-
-/// Function type for filtering by manufacturer data.
-/// 按厂商数据过滤的函数类型。
-type ManufacturerPredicate = dyn Fn(&ManufacturerData) -> bool + Send + Sync + 'static;
-
 /// Internal abstraction shared by real peripherals and test fakes.
 /// Allows the selector to operate uniformly on both.
 /// 内部抽象：真实外设和测试替身共用，让选择器统一操作。
@@ -298,12 +292,12 @@ impl Preference {
             Self::Manufacturer(predicate) => right
                 .manufacturer_data
                 .as_ref()
-                .is_some_and(|data| predicate(data))
+                .is_some_and(predicate)
                 .cmp(
                     &left
                         .manufacturer_data
                         .as_ref()
-                        .is_some_and(|data| predicate(data)),
+                        .is_some_and(predicate),
                 ),
         }
     }
