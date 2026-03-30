@@ -10,8 +10,8 @@ categories = ["embedded", "no-std", "bluetooth"]
 
 [dependencies]
 # trouble-host is a no_std embedded BLE host stack
+# trouble-host 是 no_std 嵌入式 BLE 主机协议栈
 trouble-host = { version = "0.6.0", features = ["default-packet-pool-mtu-255", "derive"] }
-embassy-futures = "0.1"
+embassy-sync = "0.7"
 rtt-target = "0.6"
 postcard = { version = "1", default-features = false, features = ["alloc"] }
-
