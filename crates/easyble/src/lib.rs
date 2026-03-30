@@ -46,8 +46,3 @@ extern crate alloc;
 
 pub mod gap;
 pub mod gatt;
-
-// Re-export the most commonly used types for convenience
-// 导出常用类型，方便调用方使用
-pub use gap::{AdvertisementData, AdvertisementView, InitConfig, InitializedStack};
-pub use trouble_host::prelude::{Connection, DefaultPacketPool, Error, GattConnection, GattEvent};

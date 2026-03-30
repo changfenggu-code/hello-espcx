@@ -1,32 +1,20 @@
-//! Peripheral 产品层 — BLE 外设固件 / Peripheral product layer — BLE peripheral firmware.
+//! Peripheral 产品层 — BLE 外设固件产品逻辑
+//! Peripheral product layer / BLE peripheral firmware product logic.
 //!
-//! 本文件是 crate root（`lib.rs`），包含所有服务定义和 `easyble::AppHooks` 实现。
-//! This file is the crate root (`lib.rs`), containing all service definitions and `easyble::AppHooks` implementation.
+//! 本文件是 crate root（`lib.rs`），包含所有产品特定的代码：
+//! The app keeps product-owned pieces here:
+//! - GATT 服务定义 / service definitions
+//! - 广播载荷构建 / advertisement payload building
+//! - 产品特定的 GATT 事件处理 / product-specific GATT event handling
+//! - 产品特定的主动推送任务 / product-specific active tasks
 //!
-//! ## 生命周期 / Lifecycle
-//!
-//! ```text
-//! easyble::run()
-//!   ├─ build_advertisement()  →  构建广播数据
-//!   ├─ build_server()        →  构建 GATT server（泄漏为 'static）
-//!   └─ on_session(conn)       →  每次连接会话
-//! ```
+//! 生命周期循环由二进制 target（`main.rs`）手动组装，lib 只提供构建块。
+//! The lifecycle loop itself is now assembled manually by the binary target.
 
 #![no_std]
 extern crate alloc;
 
-// ============================================================================
-// Services — 5 GATT 服务合并于此 / 5 GATT services merged here
-// ============================================================================
-//
-// | 服务 / Service | UUID | 说明 / Description |
-// |---|---|---|
-// | Battery | 0x180F | 标准 BLE 电量 / Standard BLE battery |
-// | Device Info | 0x180A | 标准 BLE 设备信息 / Standard BLE device info |
-// | Echo | 自定义 | 双向数据完整性验证 / Bidirectional integrity check |
-// | Status | 自定义 | read/write/notify 演示 / Read/write/notify demo |
-// | Bulk | 自定义 | 大批量数据传输 / Bulk data transfer |
-
+use alloc::boxed::Box;
 use heapless::Vec;
 use postcard::to_slice;
 use rtt_target::rprintln;
@@ -34,18 +22,23 @@ use trouble_host::prelude::*;
 
 use hello_ble_common::{bulk, echo, status};
 
-/// Battery Service / 电池服务（标准 BLE）。
+// ============================================================================
+// Services — 5 个 GATT 服务定义 / 5 GATT service definitions
+// ============================================================================
+
+/// Battery Service / 标准 BLE 电量监测服务.
 ///
-/// UUID: `0x180F`（服务）、`0x2A19`（电量特征）。
+/// UUID: `0x180F`（服务）、`0x2A19`（电量特征）。支持 read + notify。
 #[gatt_service(uuid = service::BATTERY)]
 pub struct BatteryService {
+    /// 电量百分比，支持 read + notify / Battery level percentage, read + notify.
     #[characteristic(uuid = characteristic::BATTERY_LEVEL, read, notify, value = 50)]
     pub level: u8,
 }
 
-/// Device Information Service / 设备信息服务（标准 BLE）。
+/// Device Information Service / 标准 BLE 设备信息服务.
 ///
-/// UUID: `0x180A`。
+/// UUID: `0x180A`。全部只读，连接后读取一次即可。
 #[gatt_service(uuid = service::DEVICE_INFORMATION)]
 pub struct DeviceInfoService {
     #[characteristic(uuid = characteristic::MANUFACTURER_NAME_STRING, read, value = "ESP")]
@@ -58,40 +51,45 @@ pub struct DeviceInfoService {
     pub software: &'static str,
 }
 
-/// Echo Service / 回声服务（自定义）。
+/// Echo Service / 自定义回声服务.
 ///
 /// UUID: `echo::SERVICE_UUID`。Central 写入数据，Peripheral notify 回传。
 #[gatt_service(uuid = echo::SERVICE_UUID)]
 pub struct EchoService {
+    /// Echo 特征，支持 write + notify / Echo characteristic, write + notify.
     #[characteristic(uuid = echo::UUID, write, notify, value = Vec::new())]
     pub echo: Vec<u8, { echo::CAPACITY }>,
 }
 
-/// Status Service / 状态服务（自定义）。
+/// Status Service / 自定义状态服务.
 ///
-/// UUID: `status::SERVICE_UUID`。演示 read/write/notify。
+/// UUID: `status::SERVICE_UUID`。演示 read + write + notify。
 #[gatt_service(uuid = status::SERVICE_UUID)]
 pub struct StatusService {
+    /// 状态特征，postcard 序列化的 bool / Status characteristic, postcard-serialized bool.
     #[characteristic(uuid = status::UUID, read, write, notify, value = initial_status_value())]
     pub status: Vec<u8, { status::CAPACITY }>,
 }
 
-/// 生成 Status 初始值（`false`）/ Generate initial value for Status (`false`).
+/// 生成 Status 初始值（`false`）/ Generate initial value for Status characteristic (`false`).
 fn initial_status_value() -> Vec<u8, { status::CAPACITY }> {
     let mut buf = [0u8; status::CAPACITY];
     let used = to_slice(&false, &mut buf).unwrap();
     Vec::from_slice(used).unwrap()
 }
 
-/// Bulk Service / 批量传输服务（自定义）。
+/// Bulk Service / 自定义批量传输服务.
 ///
-/// UUID: `bulk::SERVICE_UUID`。
+/// UUID: `bulk::SERVICE_UUID`。支持双向大批量数据传输。
 #[gatt_service(uuid = bulk::SERVICE_UUID)]
 pub struct BulkService {
+    /// 控制特征：Idle / ResetStats / StartStream 命令 / Control: Idle/ResetStats/StartStream commands.
     #[characteristic(uuid = bulk::CONTROL_UUID, write, read, value = initial_bulk_control_value())]
     pub control: Vec<u8, { bulk::CONTROL_CAPACITY }>,
+    /// 数据特征：双向传输（write = 上传，notify = 下发）/ Data: bidirectional (write=upload, notify=download).
     #[characteristic(uuid = bulk::CHUNK_UUID, write, write_without_response, notify, value = Vec::new())]
     pub data: Vec<u8, { bulk::CHUNK_SIZE }>,
+    /// 统计特征：只读，反映 rx/tx 字节计数 / Stats: read-only, reflects rx/tx byte counters.
     #[characteristic(uuid = bulk::STATS_UUID, read, value = initial_bulk_stats_value())]
     pub stats: Vec<u8, { bulk::STATS_CAPACITY }>,
 }
@@ -114,7 +112,7 @@ fn initial_bulk_stats_value() -> Vec<u8, { bulk::STATS_CAPACITY }> {
 // Server — GATT 属性服务器 / GATT attribute server
 // ============================================================================
 
-/// 产品 GATT server（5 个服务）。
+/// 产品 GATT server（由 5 个服务组成）。
 #[allow(clippy::needless_borrows_for_generic_args)]
 #[gatt_server]
 pub struct Server {
@@ -126,12 +124,65 @@ pub struct Server {
 }
 
 // ============================================================================
-// AppHooks — easyble 集成 / easyble integration
+// 产品入口函数 / Product entry functions
 // ============================================================================
 
-/// 累计接收字节数 / Cumulative received bytes.
+/// 构建产品广播载荷 / Build the product advertisement payload.
+///
+/// 包含 Flags、Service UUIDs、设备名和厂商数据。
+/// Contains Flags, Service UUIDs, device name, and manufacturer data.
+pub fn build_advertisement() -> Result<easyble::AdvertisementData, Error> {
+    use hello_ble_common::advertisement_identity;
+
+    let mut adv_data = [0u8; 31];
+    let manufacturer_payload = advertisement_identity::ManufacturerPayload::new(
+        advertisement_identity::PRODUCT_ID_HELLO_ESPCX,
+        advertisement_identity::unit_id_from_address(hello_ble_common::PERIPHERAL_ADDRESS),
+        0,
+    )
+    .to_bytes();
+
+    let adv_len = AdStructure::encode_slice(
+        &[
+            AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
+            AdStructure::ServiceUuids16(&[hello_ble_common::battery::SERVICE_UUID16.to_le_bytes()]),
+            AdStructure::CompleteLocalName(hello_ble_common::PERIPHERAL_NAME.as_bytes()),
+            AdStructure::ManufacturerSpecificData {
+                company_identifier: advertisement_identity::DEVELOPMENT_COMPANY_ID,
+                payload: &manufacturer_payload,
+            },
+        ],
+        &mut adv_data[..],
+    )?;
+
+    Ok(easyble::AdvertisementData {
+        adv_data,
+        adv_len,
+        scan_data: [0; 31],
+        scan_len: 0,
+    })
+}
+
+/// 构建并泄漏产品 server，使生命周期循环可跨会话复用
+/// Build and leak the product server so the app lifecycle loop can reuse it
+/// across advertising sessions.
+pub fn build_server() -> Result<&'static Server<'static>, Error> {
+    let server = Server::new_with_config(GapConfig::Peripheral(PeripheralConfig {
+        name: hello_ble_common::PERIPHERAL_NAME,
+        appearance: &appearance::power_device::GENERIC_POWER_DEVICE,
+    }))
+    .unwrap();
+
+    Ok(Box::leak(Box::new(server)))
+}
+
+// ============================================================================
+// 传输统计 / Transfer stats
+// ============================================================================
+
+/// 累计接收字节数（Central → Peripheral）/ Cumulative received bytes (Central → Peripheral).
 static RX_BYTES: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
-/// 累计发送字节数 / Cumulative sent bytes.
+/// 累计发送字节数（Peripheral → Central）/ Cumulative sent bytes (Peripheral → Central).
 static TX_BYTES: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
 
 /// 重置传输统计 / Reset transfer stats.
@@ -162,107 +213,13 @@ fn sync_bulk_stats(
     }
 }
 
-/// 产品 App 状态 — 实现 `easyble::AppHooks`。
-pub struct AppState {
-    /// 泄漏的 GATT server 原始指针 / Leaked GATT server raw pointer.
-    server_ptr: Option<*mut Server<'static>>,
-    /// 广播数据 / Advertisement data.
-    adv: easyble::AdvertisementData,
-}
-
-impl AppState {
-    pub fn new() -> Self {
-        Self {
-            server_ptr: None,
-            adv: easyble::AdvertisementData {
-                adv_data: [0; 31],
-                adv_len: 0,
-                scan_data: [0; 31],
-                scan_len: 0,
-            },
-        }
-    }
-}
-
-impl Default for AppState {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl easyble::AppHooks for AppState {
-    fn build_advertisement(&mut self) -> Result<easyble::AdvertisementData, Error> {
-        use hello_ble_common::advertisement_identity;
-
-        let mut adv_data = [0u8; 31];
-        let manufacturer_payload =
-            advertisement_identity::ManufacturerPayload::new(
-                advertisement_identity::PRODUCT_ID_HELLO_ESPCX,
-                advertisement_identity::unit_id_from_address(
-                    hello_ble_common::PERIPHERAL_ADDRESS,
-                ),
-                0,
-            )
-            .to_bytes();
-
-        let adv_len = AdStructure::encode_slice(
-            &[
-                AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
-                AdStructure::ServiceUuids16(&[hello_ble_common::battery::SERVICE_UUID16
-                    .to_le_bytes()]),
-                AdStructure::CompleteLocalName(hello_ble_common::PERIPHERAL_NAME.as_bytes()),
-                AdStructure::ManufacturerSpecificData {
-                    company_identifier: advertisement_identity::DEVELOPMENT_COMPANY_ID,
-                    payload: &manufacturer_payload,
-                },
-            ],
-            &mut adv_data[..],
-        )?;
-
-        self.adv = easyble::AdvertisementData {
-            adv_data,
-            adv_len,
-            scan_data: [0; 31],
-            scan_len: 0,
-        };
-        Ok(easyble::AdvertisementData {
-            adv_data: self.adv.adv_data,
-            adv_len: self.adv.adv_len,
-            scan_data: self.adv.scan_data,
-            scan_len: self.adv.scan_len,
-        })
-    }
-
-    fn build_server(&mut self) -> Result<(), Error> {
-        let server = Server::new_with_config(GapConfig::Peripheral(PeripheralConfig {
-            name: hello_ble_common::PERIPHERAL_NAME,
-            appearance: &appearance::power_device::GENERIC_POWER_DEVICE,
-        }))
-        .unwrap();
-
-        // 泄漏为 'static，绕过 Deref coercion 问题
-        self.server_ptr =
-            Some(alloc::boxed::Box::into_raw(alloc::boxed::Box::new(server)));
-        Ok(())
-    }
-
-    async fn on_session(&mut self, conn: Connection<'_, DefaultPacketPool>) {
-        let server = unsafe { &mut *self.server_ptr.unwrap() };
-        let Ok(gatt_conn) = conn.with_attribute_server(server) else {
-            rprintln!("[app] failed to bind GATT server");
-            return;
-        };
-
-        let session_fut = run_product_session(&gatt_conn, server);
-        let task_fut = custom_task(&gatt_conn, server);
-        embassy_futures::join::join(session_fut, task_fut).await;
-    }
-}
-
 // ============================================================================
-// 会话处理 / Session handling
+// GATT 事件处理 / GATT event handling
 // ============================================================================
 
+/// 产品特征的句柄缓存 / Cached handles for product characteristics.
+///
+/// 避免每次事件都从 server 查找特征。在会话开始时一次性克隆所有 handle。
 struct ProductHandles {
     level: Characteristic<u8>,
     echo: Characteristic<Vec<u8, { echo::CAPACITY }>>,
@@ -273,6 +230,7 @@ struct ProductHandles {
 }
 
 impl ProductHandles {
+    /// 从 server 中提取所有产品特征的 handle / Extract all product characteristic handles from server.
     fn new(server: &Server<'_>) -> Self {
         Self {
             level: server.battery_service.level,
@@ -285,6 +243,9 @@ impl ProductHandles {
     }
 }
 
+/// 处理 GATT 事件分派 / Handle GATT event dispatch.
+///
+/// 按 handle 匹配事件，执行对应产品的日志记录和副作用。
 fn handle_gatt_event(
     server: &Server<'_>,
     handles: &ProductHandles,
@@ -328,35 +289,26 @@ fn handle_gatt_event(
     }
 }
 
-async fn gatt_session(
-    conn: &GattConnection<'_, '_, DefaultPacketPool>,
-    mut on_event: impl for<'a, 's> FnMut(&GattEvent<'a, 's, DefaultPacketPool>),
-) -> Result<(), Error> {
-    let reason = loop {
-        match conn.next().await {
-            GattConnectionEvent::Disconnected { reason } => break reason,
-            GattConnectionEvent::Gatt { event } => {
-                on_event(&event);
-                if let Ok(reply) = event.accept() {
-                    let _ = reply.send().await;
-                }
-            }
-            _ => {}
-        }
-    };
-    rprintln!("[gatt] disconnected: {:?}", reason);
-    Ok(())
-}
+// ============================================================================
+// 连接会话任务 / Connected session tasks
+// ============================================================================
 
-async fn run_product_session(
+/// 运行产品 GATT 会话（被动事件处理）/ Run product GATT session (passive event handling).
+///
+/// 持续从连接中读取 GATT 事件并分派给 `handle_gatt_event`，直到连接断开。
+pub async fn run_product_session(
     conn: &GattConnection<'_, '_, DefaultPacketPool>,
     server: &Server<'_>,
 ) {
     let handles = ProductHandles::new(server);
-    let _ = gatt_session(conn, |e| handle_gatt_event(server, &handles, e)).await;
+    let _ = easyble::gatt::session(conn, |event| handle_gatt_event(server, &handles, event)).await;
 }
 
-async fn custom_task(
+/// 运行主动推送任务 / Run active push tasks.
+///
+/// 在后台持续运行，直到 notify 失败（连接断开）时退出。
+/// 运行：bulk 流、echo 回传、电量通知，循环间隔 2 秒。
+pub async fn custom_task(
     conn: &GattConnection<'_, '_, DefaultPacketPool>,
     server: &Server<'_>,
 ) {
@@ -371,7 +323,7 @@ async fn custom_task(
     let mut battery_tick: u8 = 0;
 
     loop {
-        // 1. 检查 bulk StartStream 命令
+        // 1. 检查 bulk StartStream 命令 / Check bulk StartStream command
         if let Ok(raw) = server.get(&bulk_control) {
             if let Ok(bulk::BulkControlCommand::StartStream { total_bytes }) =
                 pb_from_bytes::<bulk::BulkControlCommand>(&raw)
@@ -383,7 +335,7 @@ async fn custom_task(
             }
         }
 
-        // 2. Echo 回传
+        // 2. Echo 回传 / Echo notify
         if let Ok(data) = server.get(&echo) {
             if !data.is_empty() {
                 rprintln!("[echo] notifying {} bytes", data.len());
@@ -394,17 +346,20 @@ async fn custom_task(
             }
         }
 
-        // 3. 电量通知
+        // 3. 电量通知 / Battery notify
         battery_tick = battery_tick.wrapping_add(1);
         if level.notify(conn, &battery_tick).await.is_err() {
             break;
         }
 
-        // 4. 等待 2 秒
+        // 4. 等待 2 秒 / Wait 2 seconds
         embassy_time::Timer::after_secs(2).await;
     }
 }
 
+/// 执行 bulk 下发流 / Execute bulk download stream.
+///
+/// 用确定性测试模式填满每个 chunk，通过 notify 逐块发送直到达到 `total_bytes`。
 async fn run_bulk_stream(
     server: &Server<'_>,
     conn: &GattConnection<'_, '_, DefaultPacketPool>,
