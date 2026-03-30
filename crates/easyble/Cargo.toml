@@ -1,0 +1,17 @@
+[package]
+name = "easyble"
+version = "0.1.0"
+edition = "2021"
+description = "Ergonomic BLE peripheral runtime on top of trouble-host"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/changfenggu-code/hello-espcx"
+keywords = ["ble", "bluetooth", "embedded", "peripheral", "trouble-host"]
+categories = ["embedded", "no-std", "bluetooth"]
+
+[dependencies]
+# trouble-host is a no_std embedded BLE host stack
+trouble-host = { version = "0.6.0", features = ["default-packet-pool-mtu-255", "derive"] }
+embassy-futures = "0.1"
+rtt-target = "0.6"
+postcard = { version = "1", default-features = false, features = ["alloc"] }
+

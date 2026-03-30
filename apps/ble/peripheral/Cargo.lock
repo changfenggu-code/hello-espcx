@@ -296,6 +296,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "easyble"
+version = "0.1.0"
+dependencies = [
+ "embassy-futures",
+ "postcard",
+ "rtt-target",
+ "trouble-host",
+]
+
+[[package]]
 name = "embassy-embedded-hal"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -453,6 +463,12 @@ checksum = "0c4c685bbef7fe13c3c6dd4da26841ed3980ef33e841cddfa15ce8a8fb3f1884"
 dependencies = [
  "embedded-hal 1.0.0",
 ]
+
+[[package]]
+name = "embedded-io"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef1a6892d9eef45c8fa6b9e0086428a2cca8491aca8f787c534a3d6d0bcb3ced"
 
 [[package]]
 name = "embedded-io"
@@ -1026,6 +1042,7 @@ name = "hello-ble-peripheral"
 version = "0.1.0"
 dependencies = [
  "bt-hci",
+ "easyble",
  "embassy-executor",
  "embassy-futures",
  "embassy-sync 0.7.2",
@@ -1266,6 +1283,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6764c3b5dd454e283a30e6dfe78e9b31096d9e32036b5d1eaac7a6119ccb9a24"
 dependencies = [
  "cobs",
+ "embedded-io 0.4.0",
+ "embedded-io 0.6.1",
  "serde",
 ]
 

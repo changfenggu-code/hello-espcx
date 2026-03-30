@@ -13,7 +13,8 @@ embassy-executor = { version = "0.9" }
 bt-hci = { version = "0.8" }
 heapless = "0.9"
 hello-ble-common = { path = "../common" }
-postcard = { version = "1", default-features = false }
+easyble = { path = "../../../crates/easyble" }
+postcard = { version = "1", default-features = false, features = ["alloc"] }
 serde = { version = "1", default-features = false }
 
 rtt-target = "0.6"

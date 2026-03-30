@@ -56,7 +56,7 @@
 - 中心程序按名字 `hello-espcx` 扫描
 - 中心程序读取并订阅 Battery Level 特征值 `0x2A19`
 - 外设入口：`apps/ble/peripheral/src/main.rs`
-- GATT 服务：`apps/ble/peripheral/src/ble_bas_peripheral.rs`
+- 外设产品层：`apps/ble/peripheral/src/lib.rs`（包含所有 GATT 服务定义 + `AppHooks` 实现）
 - 中心程序入口：`apps/ble/central/src/main.rs`
 
 只要你改动广播名、地址、UUID、通知行为、manufacturer payload 结构，就要默认认为这是跨端改动。
@@ -209,7 +209,7 @@ just flash
 
 ### peripheral 注释与编码约束
 
-- `apps/ble/peripheral/` 下当前正在补充较多中文和双语注释；修改这些文件时，优先做局部编辑，不要为了省事直接整文件重写
+- `apps/ble/peripheral/src/lib.rs` 是 crate root（`lib.rs`），包含所有 GATT 服务定义和 `easyble::AppHooks` 实现；产品层所有代码都在这一个文件里
 - 如果文件里已有中文注释，默认认为这些注释需要被保留；除非任务明确要求同步改注释，否则不要随手删改
 - 如果读取文件时看到中文乱码，先尝试按 UTF-8 重新查看内容，再判断注释含义，不要把乱码内容当成原文覆盖回文件
 - 做结构重构时，尽量把代码移动和注释移动一起处理，避免把原有中文说明丢失
@@ -250,12 +250,13 @@ just flash
 
 ## 当前基线
 
-截至 2026-03-28，以下检查已在仓库里跑通：
+截至 2026-03-31，以下检查已在仓库里跑通：
 
 ```bash
 cargo test -p btleplus
 cargo test -p hello-ble-central --lib
 cargo check -p hello-ble-central
+cargo check -p easyble
 cd apps/ble/peripheral && cargo check --target riscv32imac-unknown-none-elf
 ```
 
