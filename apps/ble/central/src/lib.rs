@@ -24,9 +24,7 @@ use btleplus::{
     Result as BtleplusResult, ScanFilter, Selector, Uuid,
 };
 use futures_util::StreamExt;
-use hello_ble_common::{
-    PERIPHERAL_NAME, advertisement_identity, battery, bulk, device_info, echo, status,
-};
+use hello_ble_common::{advertisement_identity, battery, bulk, device_info, echo, status};
 use tokio::time::sleep;
 
 /// 默认扫描超时 / Default scan timeout (30 seconds).
@@ -164,7 +162,7 @@ pub async fn connect_session_with_timeout(timeout: Duration) -> Result<BleSessio
 
     tracing::info!(
         "Connected to {} (unit_id={})",
-        candidate.local_name().unwrap_or(PERIPHERAL_NAME),
+        candidate.local_name().unwrap_or(hello_ble_common::PERIPHERAL_NAME),
         candidate.identity().unit_id
     );
 
@@ -503,12 +501,12 @@ fn build_session(gatt: Client) -> Result<BleSession, Error> {
 /// 构建产品扫描过滤器 / Build the product scan filter.
 ///
 /// 按三个条件过滤外设 / Filters peripherals by three criteria:
-/// 1. 广播名匹配 `PERIPHERAL_NAME` / Name matches `PERIPHERAL_NAME`
+/// 1. 广播名匹配 `hello_ble_common::PERIPHERAL_NAME` / Name matches `hello_ble_common::PERIPHERAL_NAME`
 /// 2. 包含 Battery Service UUID / Contains Battery Service UUID
 /// 3. 厂商数据匹配产品身份 / Manufacturer data matches product identity
 fn build_product_scan_filter() -> ScanFilter {
     ScanFilter::default()
-        .with_name_pattern(PERIPHERAL_NAME)
+        .with_name_pattern(hello_ble_common::PERIPHERAL_NAME)
         .with_service_uuid(Uuid::from_u16(battery::service::UUID16))
         .with_manufacturer_company_id(advertisement_identity::DEVELOPMENT_COMPANY_ID)
         .with_manufacturer_data(matches_product_identity)
