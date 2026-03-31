@@ -20,7 +20,7 @@ use postcard::to_slice;
 use rtt_target::rprintln;
 use trouble_host::prelude::*;
 
-use hello_ble_common::{advertisement_identity, battery, bulk, device_info, echo, status};
+use hello_ble_common::{advertisement_identity, battery, bulk, echo, status};
 
 // ============================================================================
 // Services — 5 个 GATT 服务定义 / 5 GATT service definitions
@@ -138,6 +138,7 @@ pub struct Server {
 pub fn build_advertisement() -> Result<easyble::gap::AdvertisementData, Error> {
     let mut adv_data = [0u8; 31];
     let manufacturer_payload = advertisement_identity::ManufacturerPayload::new(
+        advertisement_identity::VERSION,
         advertisement_identity::PRODUCT_ID_HELLO_ESPCX,
         advertisement_identity::unit_id_from_address(hello_ble_common::PERIPHERAL_ADDRESS),
         0,

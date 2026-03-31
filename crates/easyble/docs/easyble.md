@@ -24,6 +24,35 @@ This crate intentionally does not own the outer lifecycle loop. The app keeps
 control of reconnect policy, fatal-error policy, product tasks, and session-end
 handling.
 
+## Concurrent Execution Model
+
+The app runs two async tasks in parallel via `join`:
+
+```text
+┌──────────────────────────────────────────────────────┐
+│              join (parallel)                          │
+├─────────────────────┬────────────────────────────────┤
+│   run_stack()      │   lifecycle loop                │
+├─────────────────────┼────────────────────────────────┤
+│ runner.run()        │ advertising()                   │
+│   ↓                 │   ↓                            │
+│ drives ALL BLE      │ wait for connection             │
+│ protocol handling   │   ↓                            │
+│ (HCI commands/     │ connected(server)               │
+│  events/ACL data)  │   ↓                            │
+│                    │ session()                       │
+│                    │   ↓                            │
+│                    │ disconnected                    │
+│                    │   ↓                            │
+│                    │ advertising() ...               │
+└─────────────────────┴────────────────────────────────┘
+```
+
+`run_stack()` is pure I/O driving — it calls `runner.run()` repeatedly to
+process every HCI event and ACL packet from the controller. It knows nothing
+about what the upper layer is doing (advertising, connecting). The lifecycle
+loop owns the reconnect policy, product tasks, and session-end handling.
+
 ## Quick Start
 
 ```rust

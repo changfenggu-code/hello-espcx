@@ -95,9 +95,9 @@ pub mod advertisement_identity {
 
     impl ManufacturerPayload {
         /// Create a payload with the current protocol version baked in.
-        pub const fn new(product_id: u8, unit_id: u32, flags: u8) -> Self {
+        pub const fn new(version: u8, product_id: u8, unit_id: u32, flags: u8) -> Self {
             Self {
-                version: VERSION,
+                version,
                 product_id,
                 unit_id,
                 flags,
