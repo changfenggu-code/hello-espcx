@@ -89,12 +89,12 @@ async fn main(_s: Spawner) {
     };
 
     // === 5. 初始化 BLE 协议栈 / Init BLE protocol stack ===
-    let easyble::InitializedStack {
+    let easyble::gap::InitializedStack {
         mut peripheral,
         runner,
     } = easyble::gap::init::<_, CONNECTIONS_MAX, L2CAP_CHANNELS_MAX>(
         controller,
-        easyble::InitConfig {
+        easyble::gap::InitConfig {
             address: PERIPHERAL_ADDRESS,
         },
     );

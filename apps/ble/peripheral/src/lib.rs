@@ -131,7 +131,7 @@ pub struct Server {
 ///
 /// 包含 Flags、Service UUIDs、设备名和厂商数据。
 /// Contains Flags, Service UUIDs, device name, and manufacturer data.
-pub fn build_advertisement() -> Result<easyble::AdvertisementData, Error> {
+pub fn build_advertisement() -> Result<easyble::gap::AdvertisementData, Error> {
     use hello_ble_common::advertisement_identity;
 
     let mut adv_data = [0u8; 31];
@@ -155,7 +155,7 @@ pub fn build_advertisement() -> Result<easyble::AdvertisementData, Error> {
         &mut adv_data[..],
     )?;
 
-    Ok(easyble::AdvertisementData {
+    Ok(easyble::gap::AdvertisementData {
         adv_data,
         adv_len,
         scan_data: [0; 31],
