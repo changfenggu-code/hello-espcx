@@ -1,4 +1,5 @@
 CHIP := "esp32c6"
+PERIPHERAL_TARGET := "riscv32imac-unknown-none-elf"
 
 default := "show"
 
@@ -24,15 +25,15 @@ kill-probe:
 
 [working-directory: "apps/ble/peripheral"]
 build:
-    cargo build --release
+    cargo build --release --target {{PERIPHERAL_TARGET}}
 
 [working-directory: "apps/ble/peripheral"]
 build-debug:
-    cargo build
+    cargo build --target {{PERIPHERAL_TARGET}}
 
 [working-directory: "apps/ble/peripheral"]
 check-peripheral:
-    cargo check
+    cargo check --target {{PERIPHERAL_TARGET}}
 
 # Burn: download only (no run)
 [working-directory: "apps/ble/peripheral"]
@@ -55,7 +56,7 @@ flash-debug: build-debug kill-probe
 
 [working-directory: "apps/ble/peripheral"]
 clippy-peripheral:
-    cargo clippy --no-deps -- -D warnings
+    cargo clippy --target {{PERIPHERAL_TARGET}} --no-deps -- -D warnings
 
 # === Central ===
 
@@ -84,8 +85,20 @@ run-central:
 check-btleplus:
     cargo check
 
+[working-directory: "apps/ble/common"]
+check-common:
+    cargo check
+
+[working-directory: "crates/easyble"]
+check-easyble:
+    cargo check
+
 [working-directory: "crates/btleplus"]
 clippy-btleplus:
+    cargo clippy -- -D warnings
+
+[working-directory: "crates/easyble"]
+clippy-easyble:
     cargo clippy -- -D warnings
 
 # === Hardware ===
@@ -100,18 +113,22 @@ list-chips:
 
 # === Tests ===
 
-# Check common workspace (common + central)
+# Check host-side crates (common + central + btleplus + easyble)
 check:
+    just check-common
     just check-central
+    just check-btleplus
+    just check-easyble
 
 # Check common + peripheral (requires riscv target)
 check-all:
-    just check-central
+    just check
     just check-peripheral
 
 clippy:
     just clippy-central
     just clippy-btleplus
+    just clippy-easyble
 
 hil-test-live:
     cargo test -p hello-ble-central --test hil_real esp32c6_end_to_end_hil -- --ignored --nocapture --test-threads=1
@@ -124,8 +141,8 @@ hil-stress-live-5m:
 
 [working-directory: "apps/ble/peripheral"]
 hil-flash-debug:
-    cargo build
-    probe-rs download --chip {{CHIP}} --verify ../../../target/riscv32imac-unknown-none-elf/debug/hello-ble-peripheral
+    cargo build --target {{PERIPHERAL_TARGET}}
+    probe-rs download --chip {{CHIP}} --verify target/{{PERIPHERAL_TARGET}}/debug/hello-ble-peripheral
     probe-rs reset --chip {{CHIP}}
     sleep 2
 
@@ -136,4 +153,3 @@ hil-test:
 hil-stress:
     just hil-flash-debug
     just hil-stress-live
-

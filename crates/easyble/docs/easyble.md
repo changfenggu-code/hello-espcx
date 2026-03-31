@@ -57,15 +57,15 @@ The **inner `join`** runs two tasks in parallel for the same connection:
 
 ```text
 ┌──────────────────────────────────────────────────────┐
-│              Session (connected)                          │
-│                                                       │
+│              Session (connected)                     │
+│                                                      │
 │  ┌──────────────────────┐  ┌──────────────────────┐  │
-│  │ Passive handler       │  │ Active task           │  │
+│  │ Passive handler      │  │ Active task          │  │
 │  │ run_product_session  │  │ custom_task          │  │
 │  └──────────────────────┘  └──────────────────────┘  │
-│          │                          │               │
+│          │                          │                │
 │   Central sends           Periodic push              │
-│   requests                (battery/echo/bulk)       │
+│   requests                (battery/echo/bulk)        │
 │   (read/write/notify)                                │
 └──────────────────────────────────────────────────────┘
 ```

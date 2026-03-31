@@ -42,6 +42,22 @@ const CONNECTIONS_MAX: usize = 1;
 /// L2CAP 通道数（Signal + ATT）/ L2CAP channel count (Signal + ATT).
 const L2CAP_CHANNELS_MAX: usize = 2;
 
+/// 初始化堆内存分配器 / Initialize heap allocators.
+///
+/// BLE 控制器的内部函数（如 `ble_controller_init`）依赖堆内存分配。
+/// BLE controller internals (e.g. `ble_controller_init`) rely on heap allocation.
+/// 因此必须在 BLE 控制器初始化之前调用本函数。
+/// Therefore this must be called before BLE controller initialization.
+///
+/// 两段内存用途 / Two memory regions:
+///
+/// - `reclaimed` (64KB): 可被 Wi-Fi 归还的内存区域 / Memory reclaimable by Wi-Fi
+/// - default (48KB): 专用 BLE 内存区域 / BLE-dedicated memory
+fn init_heap() {
+    esp_alloc::heap_allocator!(#[esp_hal::ram(reclaimed)] size: 64 * 1024);
+    esp_alloc::heap_allocator!(size: 48 * 1024);
+}
+
 /// 全局 panic 处理 — 通过 RTT 输出后死循环。
 #[panic_handler]
 fn panic(panic_info: &core::panic::PanicInfo) -> ! {
@@ -63,6 +79,8 @@ async fn main(_s: Spawner) {
     // === 1. 初始化 ESP32 外设 / Init ESP32 peripherals ===
     rprintln!("[init] {} peripheral starting...", PERIPHERAL_NAME);
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
+    init_heap();
+    rprintln!("[init] heap ready: {} bytes free", esp_alloc::HEAP.free());
 
     // === 2. 配置 RTOS 调度器 / Configure RTOS scheduler ===
     // embassy 异步运行时需要硬件 timer + software interrupt 驱动
