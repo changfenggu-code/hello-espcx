@@ -51,7 +51,7 @@ fn product_scan_filter_targets_expected_name_service_and_company() {
     assert_eq!(filter.name_patterns, vec![PERIPHERAL_NAME.to_string()]);
     assert_eq!(
         filter.service_uuids,
-        vec![Uuid::from_u16(battery::SERVICE_UUID16)]
+        vec![Uuid::from_u16(battery::service::UUID16)]
     );
     assert_eq!(
         filter.manufacturer_company_ids,

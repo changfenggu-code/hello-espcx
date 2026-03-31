@@ -20,7 +20,7 @@ use postcard::to_slice;
 use rtt_target::rprintln;
 use trouble_host::prelude::*;
 
-use hello_ble_common::{bulk, echo, status};
+use hello_ble_common::{advertisement_identity, battery, bulk, device_info, echo, status};
 
 // ============================================================================
 // Services — 5 个 GATT 服务定义 / 5 GATT service definitions
@@ -53,21 +53,23 @@ pub struct DeviceInfoService {
 
 /// Echo Service / 自定义回声服务.
 ///
-/// UUID: `echo::SERVICE_UUID`。Central 写入数据，Peripheral notify 回传。
-#[gatt_service(uuid = echo::SERVICE_UUID)]
+/// UUID: `echo::service::UUID128`（服务）、
+/// `echo::characteristic::ECHO_UUID128`（特征）。Central 写入数据，Peripheral notify 回传。
+#[gatt_service(uuid = echo::service::UUID128)]
 pub struct EchoService {
     /// Echo 特征，支持 write + notify / Echo characteristic, write + notify.
-    #[characteristic(uuid = echo::UUID, write, notify, value = Vec::new())]
+    #[characteristic(uuid = echo::characteristic::ECHO_UUID128, write, notify, value = Vec::new())]
     pub echo: Vec<u8, { echo::CAPACITY }>,
 }
 
 /// Status Service / 自定义状态服务.
 ///
-/// UUID: `status::SERVICE_UUID`。演示 read + write + notify。
-#[gatt_service(uuid = status::SERVICE_UUID)]
+/// UUID: `status::service::UUID128`（服务）、
+/// `status::characteristic::STATUS_UUID128`（特征）。演示 read + write + notify。
+#[gatt_service(uuid = status::service::UUID128)]
 pub struct StatusService {
     /// 状态特征，postcard 序列化的 bool / Status characteristic, postcard-serialized bool.
-    #[characteristic(uuid = status::UUID, read, write, notify, value = initial_status_value())]
+    #[characteristic(uuid = status::characteristic::STATUS_UUID128, read, write, notify, value = initial_status_value())]
     pub status: Vec<u8, { status::CAPACITY }>,
 }
 
@@ -80,17 +82,19 @@ fn initial_status_value() -> Vec<u8, { status::CAPACITY }> {
 
 /// Bulk Service / 自定义批量传输服务.
 ///
-/// UUID: `bulk::SERVICE_UUID`。支持双向大批量数据传输。
-#[gatt_service(uuid = bulk::SERVICE_UUID)]
+/// UUID: `bulk::service::UUID128`（服务）、
+/// `bulk::characteristic::CONTROL_UUID128` / `DATA_UUID128` / `STATS_UUID128`（特征）。
+/// 支持双向大批量数据传输。
+#[gatt_service(uuid = bulk::service::UUID128)]
 pub struct BulkService {
     /// 控制特征：Idle / ResetStats / StartStream 命令 / Control: Idle/ResetStats/StartStream commands.
-    #[characteristic(uuid = bulk::CONTROL_UUID, write, read, value = initial_bulk_control_value())]
+    #[characteristic(uuid = bulk::characteristic::CONTROL_UUID128, write, read, value = initial_bulk_control_value())]
     pub control: Vec<u8, { bulk::CONTROL_CAPACITY }>,
     /// 数据特征：双向传输（write = 上传，notify = 下发）/ Data: bidirectional (write=upload, notify=download).
-    #[characteristic(uuid = bulk::CHUNK_UUID, write, write_without_response, notify, value = Vec::new())]
+    #[characteristic(uuid = bulk::characteristic::DATA_UUID128, write, write_without_response, notify, value = Vec::new())]
     pub data: Vec<u8, { bulk::CHUNK_SIZE }>,
     /// 统计特征：只读，反映 rx/tx 字节计数 / Stats: read-only, reflects rx/tx byte counters.
-    #[characteristic(uuid = bulk::STATS_UUID, read, value = initial_bulk_stats_value())]
+    #[characteristic(uuid = bulk::characteristic::STATS_UUID128, read, value = initial_bulk_stats_value())]
     pub stats: Vec<u8, { bulk::STATS_CAPACITY }>,
 }
 
@@ -132,8 +136,6 @@ pub struct Server {
 /// 包含 Flags、Service UUIDs、设备名和厂商数据。
 /// Contains Flags, Service UUIDs, device name, and manufacturer data.
 pub fn build_advertisement() -> Result<easyble::gap::AdvertisementData, Error> {
-    use hello_ble_common::advertisement_identity;
-
     let mut adv_data = [0u8; 31];
     let manufacturer_payload = advertisement_identity::ManufacturerPayload::new(
         advertisement_identity::PRODUCT_ID_HELLO_ESPCX,
@@ -145,7 +147,7 @@ pub fn build_advertisement() -> Result<easyble::gap::AdvertisementData, Error> {
     let adv_len = AdStructure::encode_slice(
         &[
             AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
-            AdStructure::ServiceUuids16(&[hello_ble_common::battery::SERVICE_UUID16.to_le_bytes()]),
+            AdStructure::ServiceUuids16(&[battery::service::UUID16.to_le_bytes()]),
             AdStructure::CompleteLocalName(hello_ble_common::PERIPHERAL_NAME.as_bytes()),
             AdStructure::ManufacturerSpecificData {
                 company_identifier: advertisement_identity::DEVELOPMENT_COMPANY_ID,

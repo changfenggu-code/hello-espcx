@@ -72,9 +72,9 @@ pub struct ProductCandidate {
 /// UUID 分属 5 个服务 / UUIDs belong to 5 services:
 /// - **Battery** (标准): `battery_uuid`
 /// - **Device Info** (标准): `manufacturer_uuid`, `model_uuid`, `firmware_uuid`, `software_uuid`
-/// - **Echo** (自定义): `echo_uuid`
-/// - **Status** (自定义): `status_uuid`
-/// - **Bulk** (自定义): `bulk_control_uuid`, `bulk_data_uuid`, `bulk_stats_uuid`
+/// - **Echo** (自定义): 对应 `echo::service::UUID128` / `echo::characteristic::ECHO_UUID128`
+/// - **Status** (自定义): 对应 `status::service::UUID128` / `status::characteristic::STATUS_UUID128`
+/// - **Bulk** (自定义): 对应 `bulk::service::UUID128` 和三个 characteristic UUID
 pub struct BleSession {
     /// GATT 客户端，用于对已连接外设进行属性操作 / GATT client for attribute operations.
     gatt: Client,
@@ -482,17 +482,17 @@ fn build_session(gatt: Client) -> Result<BleSession, Error> {
     Ok(BleSession {
         gatt,
         // 标准 BLE 16-bit UUID / Standard BLE 16-bit UUIDs
-        battery_uuid: Uuid::from_u16(battery::LEVEL_UUID16),
-        manufacturer_uuid: Uuid::from_u16(device_info::MANUFACTURER_NAME_UUID16),
-        model_uuid: Uuid::from_u16(device_info::MODEL_NUMBER_UUID16),
-        firmware_uuid: Uuid::from_u16(device_info::FIRMWARE_REVISION_UUID16),
-        software_uuid: Uuid::from_u16(device_info::SOFTWARE_REVISION_UUID16),
+        battery_uuid: Uuid::from_u16(battery::characteristic::LEVEL_UUID16),
+        manufacturer_uuid: Uuid::from_u16(device_info::characteristic::MANUFACTURER_NAME_UUID16),
+        model_uuid: Uuid::from_u16(device_info::characteristic::MODEL_NUMBER_UUID16),
+        firmware_uuid: Uuid::from_u16(device_info::characteristic::FIRMWARE_REVISION_UUID16),
+        software_uuid: Uuid::from_u16(device_info::characteristic::SOFTWARE_REVISION_UUID16),
         // 自定义 128-bit UUID / Custom 128-bit UUIDs
-        echo_uuid: Uuid::from_u128(echo::UUID),
-        status_uuid: Uuid::from_u128(status::UUID),
-        bulk_control_uuid: Uuid::from_u128(bulk::CONTROL_UUID),
-        bulk_data_uuid: Uuid::from_u128(bulk::CHUNK_UUID),
-        bulk_stats_uuid: Uuid::from_u128(bulk::STATS_UUID),
+        echo_uuid: Uuid::from_u128(echo::characteristic::ECHO_UUID128),
+        status_uuid: Uuid::from_u128(status::characteristic::STATUS_UUID128),
+        bulk_control_uuid: Uuid::from_u128(bulk::characteristic::CONTROL_UUID128),
+        bulk_data_uuid: Uuid::from_u128(bulk::characteristic::DATA_UUID128),
+        bulk_stats_uuid: Uuid::from_u128(bulk::characteristic::STATS_UUID128),
     })
 }
 
@@ -509,7 +509,7 @@ fn build_session(gatt: Client) -> Result<BleSession, Error> {
 fn build_product_scan_filter() -> ScanFilter {
     ScanFilter::default()
         .with_name_pattern(PERIPHERAL_NAME)
-        .with_service_uuid(Uuid::from_u16(battery::SERVICE_UUID16))
+        .with_service_uuid(Uuid::from_u16(battery::service::UUID16))
         .with_manufacturer_company_id(advertisement_identity::DEVELOPMENT_COMPANY_ID)
         .with_manufacturer_data(matches_product_identity)
 }
