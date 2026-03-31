@@ -30,21 +30,21 @@ The app runs two async tasks in parallel via `join`:
 
 ```text
 ┌──────────────────────────────────────────────────────┐
-│              join (parallel)                          │
+│              join (parallel)                         │
 ├─────────────────────┬────────────────────────────────┤
-│   run_stack()      │   lifecycle loop                │
+│   run_stack()       │   lifecycle loop               │
 ├─────────────────────┼────────────────────────────────┤
-│ runner.run()        │ advertising()                   │
+│ runner.run()        │ advertising()                  │
 │   ↓                 │   ↓                            │
-│ drives ALL BLE      │ wait for connection             │
+│ drives ALL BLE      │ wait for connection            │
 │ protocol handling   │   ↓                            │
-│ (HCI commands/     │ connected(server)               │
-│  events/ACL data)  │   ↓                            │
-│                    │ session()                       │
-│                    │   ↓                            │
-│                    │ disconnected                    │
-│                    │   ↓                            │
-│                    │ advertising() ...               │
+│ (HCI commands/      │ connected(server)              │
+│  events/ACL data)   │   ↓                            │
+│                     │ session()                      │
+│                     │   ↓                            │
+│                     │ disconnected                   │
+│                     │   ↓                            │
+│                     │ advertising() ...              │
 └─────────────────────┴────────────────────────────────┘
 ```
 
@@ -52,6 +52,27 @@ The app runs two async tasks in parallel via `join`:
 process every HCI event and ACL packet from the controller. It knows nothing
 about what the upper layer is doing (advertising, connecting). The lifecycle
 loop owns the reconnect policy, product tasks, and session-end handling.
+
+The **inner `join`** runs two tasks in parallel for the same connection:
+
+```text
+┌──────────────────────────────────────────────────────┐
+│              Session (connected)                          │
+│                                                       │
+│  ┌──────────────────────┐  ┌──────────────────────┐  │
+│  │ Passive handler       │  │ Active task           │  │
+│  │ run_product_session  │  │ custom_task          │  │
+│  └──────────────────────┘  └──────────────────────┘  │
+│          │                          │               │
+│   Central sends           Periodic push              │
+│   requests                (battery/echo/bulk)       │
+│   (read/write/notify)                                │
+└──────────────────────────────────────────────────────┘
+```
+
+Both run concurrently on the same `GattConnection`. The passive handler
+blocks on GATT events; the active task drives periodic notifications.
+Either one exiting (e.g. connection lost) ends the session.
 
 ## Quick Start
 
