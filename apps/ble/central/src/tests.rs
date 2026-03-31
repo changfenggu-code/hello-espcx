@@ -48,7 +48,7 @@ fn decode_manufacturer_payload_rejects_wrong_company_or_length() {
 fn product_scan_filter_targets_expected_name_service_and_company() {
     let filter = build_product_scan_filter();
 
-    assert_eq!(filter.name_patterns, vec![PERIPHERAL_NAME.to_string()]);
+    assert_eq!(filter.name_patterns, vec![hello_ble_common::PERIPHERAL_NAME.to_string()]);
     assert_eq!(
         filter.service_uuids,
         vec![Uuid::from_u16(battery::service::UUID16)]
