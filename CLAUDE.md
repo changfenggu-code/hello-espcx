@@ -61,7 +61,7 @@ just check
 ## 代码提示
 
 - `apps/ble/peripheral/src/main.rs` 是外设入口
-- `apps/ble/peripheral/src/ble_bas_peripheral.rs` 定义 GATT 服务
+- `apps/ble/peripheral/src/lib.rs` 是 crate root，包含所有 GATT 服务定义和生命周期辅助函数
 - `apps/ble/central/src/main.rs` 是中心程序入口
 - 外设日志使用 `rprintln!`
 - `apps/ble/peripheral/` 使用 `nightly`

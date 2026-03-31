@@ -206,6 +206,7 @@ just flash
 - 外设目标是 `riscv32imac-unknown-none-elf`
 - 当前仓库未提交 `apps/ble/peripheral/.cargo/config.toml`，直接用 Cargo 时需要显式传 `--target riscv32imac-unknown-none-elf`，或优先使用根目录 `just`
 - `build.rs` 里有自定义 linker 友好报错逻辑，不要轻易删掉
+- **`init_heap()` 必须在 BLE 控制器初始化之前调用**——`ble_controller_init` 依赖堆内存分配。如果 BLE 初始化报 `ble_controller_init returned 257`，先确认 heap 已初始化
 
 ### peripheral 注释与编码约束
 
