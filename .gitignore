@@ -26,3 +26,6 @@ target/
 
 # Reference
 llm/
+
+# Contrib (non-project files)
+contrib/
